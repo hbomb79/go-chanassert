@@ -13,16 +13,16 @@ func Test_ExpectTimeout_OneOf_String(t *testing.T) {
 		return c, chanassert.
 			NewChannelExpecter(c).
 			Ignore(
-				chanassert.ComparableEqual("foo"),
-				chanassert.ComparableEqual("bar"),
+				chanassert.MatchEqual("foo"),
+				chanassert.MatchEqual("bar"),
 			).
 			ExpectTimeout(time.Millisecond*500, chanassert.OneOf(
-				chanassert.StringContains("hell"),
-				chanassert.ComparableEqual("world"),
+				chanassert.MatchStringContains("hell"),
+				chanassert.MatchEqual("world"),
 			)).
 			Expect(chanassert.OneOf(
-				chanassert.ComparableEqual("hello"),
-				chanassert.ComparableEqual("world"),
+				chanassert.MatchEqual("hello"),
+				chanassert.MatchEqual("world"),
 			))
 	}
 
@@ -105,16 +105,16 @@ func Test_Expect_OneOf_String(t *testing.T) {
 		return c, chanassert.
 			NewChannelExpecter(c).
 			Ignore(
-				chanassert.ComparableEqual("foo"),
-				chanassert.ComparableEqual("bar"),
+				chanassert.MatchEqual("foo"),
+				chanassert.MatchEqual("bar"),
 			).
 			Expect(chanassert.OneOf(
-				chanassert.ComparableEqual("hello"),
-				chanassert.ComparableEqual("world"),
+				chanassert.MatchEqual("hello"),
+				chanassert.MatchEqual("world"),
 			)).
 			Expect(chanassert.OneOf(
-				chanassert.ComparableEqual("hello"),
-				chanassert.ComparableEqual("world"),
+				chanassert.MatchEqual("hello"),
+				chanassert.MatchEqual("world"),
 			))
 	}
 
@@ -193,16 +193,16 @@ func Test_Expect_OneOf_Struct(t *testing.T) {
 		c := make(chan Message, 10)
 		return c, chanassert.
 			NewChannelExpecter(c).
-			Ignore(chanassert.StructMatch(ignoreMessage)).
+			Ignore(chanassert.MatchStruct(ignoreMessage)).
 			Expect(chanassert.OneOf(
-				chanassert.StructFieldMatch[Message](map[string]any{
+				chanassert.MatchStructFields[Message](map[string]any{
 					"Title": validMessageA.Title,
 					"Body":  validMessageA.Body,
 				}),
 			)).
 			Expect(chanassert.AllOf(
-				chanassert.StructMatch(validMessageA),
-				chanassert.StructPartialMatch(Message{Title: validMessageB.Title}), // zero-value for Body
+				chanassert.MatchStruct(validMessageA),
+				chanassert.MatchStructPartial(Message{Title: validMessageB.Title}), // zero-value for Body
 			))
 	}
 

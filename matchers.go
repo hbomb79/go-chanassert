@@ -13,50 +13,50 @@ type Matcher[T any] interface {
 	DoesMatch(t T) bool
 }
 
-type equalMatcher[T comparable] struct {
-	target T
-}
-
-func (eqMatch *equalMatcher[T]) DoesMatch(t T) bool {
-	return t == eqMatch.target
-}
-
-// ComparableEqual returns a matcher which will check if the
+// MatchEqual returns a matcher which will check if the
 // value provided is equal to the messages provided.
-func ComparableEqual[T comparable](val T) Matcher[T] {
+func MatchEqual[T comparable](val T) *equalMatcher[T] {
 	return &equalMatcher[T]{target: val}
 }
 
-type stringContainsMatcher struct{ target string }
-
-func (contains *stringContainsMatcher) DoesMatch(message string) bool {
-	return strings.Contains(message, contains.target)
-}
-
-// StringContains returns a matcher which tests if received string messages
+// MatchStringContains returns a matcher which tests if received string messages
 // contain the provided substring.
-func StringContains(target string) Matcher[string] {
+func MatchStringContains(target string) *stringContainsMatcher {
 	return &stringContainsMatcher{target: target}
 }
 
-type structEqualMatcher[T any] struct{ target T }
-
-func (eqMatch *structEqualMatcher[T]) DoesMatch(t T) bool {
-	return reflect.DeepEqual(t, eqMatch.target)
+// MatchStructFields returns a matcher which will match messages which
+// contain the field values specified. This is achieved via reflection, and
+// extra fields in the message is ignored (however a missing field will cause
+// a negative match).
+func MatchStructFields[T any](fieldsAndValues map[string]any) *structFieldMatcher[T] {
+	return &structFieldMatcher[T]{fieldsAndValues: fieldsAndValues}
 }
 
-// StructMatch returns a matcher which performs a deep-equality
+// MatchStruct returns a matcher which performs a deep-equality
 // check (using reflection).
-func StructMatch[T any](target T) Matcher[T] {
+func MatchStruct[T any](target T) *structEqualMatcher[T] {
 	return &structEqualMatcher[T]{target: target}
 }
 
-// StructPartialMatch returns a matcher which tests that
+// MatchPredicate returns a matcher which will match messages
+// which return true when passed to the predicate provided.
+func MatchPredicate[T any](predicate func(T) bool) *predicateMatcher[T] {
+	return &predicateMatcher[T]{predicate: predicate}
+}
+
+type predicateMatcher[T any] struct{ predicate func(T) bool }
+
+func (predMatcher *predicateMatcher[T]) DoesMatch(message T) bool {
+	return predMatcher.predicate(message)
+}
+
+// MatchStructPartial returns a matcher which tests that
 // all non-zero values inside of the provided struct
 // match the same fields inside of the messages received. That is
 // to say, a target with a zero-value for a field will NOT check
 // if that value is also a zero-value in the messages.
-func StructPartialMatch[T any](target T) Matcher[T] {
+func MatchStructPartial[T any](target T) *structFieldMatcher[T] {
 	fieldValues := make(map[string]any)
 	rt := reflect.TypeOf(target)
 	rv := reflect.ValueOf(target)
@@ -85,50 +85,69 @@ func StructPartialMatch[T any](target T) Matcher[T] {
 	return &structFieldMatcher[T]{fieldsAndValues: fieldValues}
 }
 
-type structFieldMatcher[T any] struct {
-	fieldsAndValues map[string]any
+type equalMatcher[T comparable] struct{ target T }
+
+func (eqMatch *equalMatcher[T]) DoesMatch(t T) bool {
+	return t == eqMatch.target
 }
+
+type stringContainsMatcher struct{ target string }
+
+func (contains *stringContainsMatcher) DoesMatch(message string) bool {
+	return strings.Contains(message, contains.target)
+}
+
+type structEqualMatcher[T any] struct{ target T }
+
+func (eqMatch *structEqualMatcher[T]) DoesMatch(t T) bool {
+	return reflect.DeepEqual(t, eqMatch.target)
+}
+
+type structFieldMatcher[T any] struct{ fieldsAndValues map[string]any }
 
 func (fieldEqMatch *structFieldMatcher[T]) DoesMatch(t T) bool {
 	rt := reflect.TypeOf(t)
 	rv := reflect.ValueOf(t)
 
-	// Check if t is a struct
 	if rt.Kind() != reflect.Struct {
 		return false
 	}
 
 	// Iterate over fieldsAndValues and compare with fields in t
 	for field, expectedValue := range fieldEqMatch.fieldsAndValues {
-		// Get the field value in t
 		fieldValue := rv.FieldByName(field)
-
-		// Check if field exists in t
 		if !fieldValue.IsValid() {
 			return false
 		}
 
-		// Check for compatibility of types
+		// If the expectedValue is a function, attempt to call it
+		// and return false for this message if the return value is false.
+		if reflect.TypeOf(expectedValue).Kind() == reflect.Func {
+			funcValue := reflect.ValueOf(expectedValue)
+			in := []reflect.Value{fieldValue}
+			returnValues := funcValue.Call(in)
+
+			// Expect a single bool return value
+			if len(returnValues) != 1 || returnValues[0].Kind() != reflect.Bool {
+				panic("Expected matching function to return a single boolean value")
+			}
+
+			if !returnValues[0].Bool() {
+				return false
+			}
+			continue
+		}
+
 		if !fieldValue.Type().AssignableTo(reflect.TypeOf(expectedValue)) {
 			return false
 		}
 
-		// Check for value equality (using Kind() for more flexibility)
-		if fieldValue.Kind() == reflect.Interface && expectedValue == nil { // Handle nil interface expectation
+		if fieldValue.Kind() == reflect.Interface && expectedValue == nil {
 			continue
 		} else if !reflect.DeepEqual(fieldValue.Interface(), expectedValue) {
 			return false
 		}
 	}
 
-	// All fields match
 	return true
-}
-
-// StructFieldMatch returns a matcher which will match messages which
-// contain the field values specified. This is achieved via reflection, and
-// extra fields in the message is ignored (however a missing field will cause
-// a negative match).
-func StructFieldMatch[T any](fieldsAndValues map[string]any) Matcher[T] {
-	return &structFieldMatcher[T]{fieldsAndValues: fieldsAndValues}
 }

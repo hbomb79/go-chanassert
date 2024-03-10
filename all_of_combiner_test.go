@@ -13,10 +13,10 @@ func Test_ExpectTimeout_AllOf_StringContains_Overlapping(t *testing.T) {
 		return c, chanassert.
 			NewChannelExpecter(c).
 			Expect(chanassert.AllOf(
-				chanassert.StringContains("foo"),
-				chanassert.StringContains("foo"),
-				chanassert.StringContains("fo"),
-				chanassert.StringContains("fooey"),
+				chanassert.MatchStringContains("foo"),
+				chanassert.MatchStringContains("foo"),
+				chanassert.MatchStringContains("fo"),
+				chanassert.MatchStringContains("fooey"),
 			))
 	}
 
@@ -85,16 +85,16 @@ func Test_ExpectTimeout_AllOf_String(t *testing.T) {
 		return c, chanassert.
 			NewChannelExpecter(c).
 			Ignore(
-				chanassert.ComparableEqual("foo"),
-				chanassert.ComparableEqual("bar"),
+				chanassert.MatchEqual("foo"),
+				chanassert.MatchEqual("bar"),
 			).
 			ExpectTimeout(time.Millisecond*500, chanassert.AllOf(
-				chanassert.ComparableEqual("hello"),
-				chanassert.ComparableEqual("world"),
+				chanassert.MatchEqual("hello"),
+				chanassert.MatchEqual("world"),
 			)).
 			Expect(chanassert.AllOf(
-				chanassert.ComparableEqual("hello"),
-				chanassert.ComparableEqual("world"),
+				chanassert.MatchEqual("hello"),
+				chanassert.MatchEqual("world"),
 			))
 	}
 
@@ -184,16 +184,16 @@ func Test_Expect_AllOf_String(t *testing.T) {
 		return c, chanassert.
 			NewChannelExpecter(c).
 			Ignore(
-				chanassert.ComparableEqual("foo"),
-				chanassert.ComparableEqual("bar"),
+				chanassert.MatchEqual("foo"),
+				chanassert.MatchEqual("bar"),
 			).
 			Expect(chanassert.AllOf(
-				chanassert.ComparableEqual("hello"),
-				chanassert.ComparableEqual("world"),
+				chanassert.MatchEqual("hello"),
+				chanassert.MatchEqual("world"),
 			)).
 			Expect(chanassert.AllOf(
-				chanassert.ComparableEqual("hello"),
-				chanassert.ComparableEqual("world"),
+				chanassert.MatchEqual("hello"),
+				chanassert.MatchEqual("world"),
 			))
 	}
 

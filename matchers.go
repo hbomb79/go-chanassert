@@ -106,6 +106,13 @@ func (eqMatch *structEqualMatcher[T]) DoesMatch(t T) bool {
 type structFieldMatcher[T any] struct{ fieldsAndValues map[string]any }
 
 func (fieldEqMatch *structFieldMatcher[T]) DoesMatch(t T) bool {
+	defer func() {
+		// Ignore. If we hit a panic while trying to
+		// handle this match, then it's clear it doesn't match. Zero-value
+		// bool of false is accurate.
+		_ = recover()
+	}()
+
 	rt := reflect.TypeOf(t)
 	rv := reflect.ValueOf(t)
 

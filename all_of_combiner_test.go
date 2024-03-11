@@ -7,7 +7,7 @@ import (
 	"chanassert"
 )
 
-func Test_ExpectTimeout_AllOf_StringContains_Overlapping(t *testing.T) {
+func Test_ExpectTimeout_AllOf_MatchStringContains_Overlapping(t *testing.T) {
 	makeExpecter := func() (chan string, chanassert.Expecter[string]) {
 		c := make(chan string, 10)
 		return c, chanassert.

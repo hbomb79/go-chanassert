@@ -1,5 +1,6 @@
 ## Chan Assert
 #### Asynchronous Channel Assertion Library
+![coverage](https://raw.githubusercontent.com/org/project/badges/.badges/main/coverage.svg)
 
 Chan Assert is a declartive library designed to help you when writing (integration) tests which deal with channels/websockets.
 

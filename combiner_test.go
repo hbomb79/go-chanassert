@@ -3,7 +3,7 @@ package chanassert_test
 import (
 	"testing"
 
-	"chanassert"
+	"github.com/hbomb79/go-chanassert"
 )
 
 type combinerTest[T any] struct {
@@ -15,14 +15,14 @@ type combinerTest[T any] struct {
 
 func runCombinerTests[T any](t *testing.T, makeCombiner func() chanassert.ExpectCombiner[T], tests []combinerTest[T]) {
 	for _, test := range tests {
-		if len(test.messages) != len(test.expected) {
-			t.Fatalf("runCombinerTests len(messages)[%d] != len(expected)[%d]", len(test.messages), len(test.expected))
-		}
-		if len(test.messages) != len(test.satisfied) {
-			t.Fatalf("runCombinerTests len(messages)[%d] != len(satisfied)[%d]", len(test.messages), len(test.satisfied))
-		}
-
 		t.Run(test.summary, func(t *testing.T) {
+			if len(test.messages) != len(test.expected) {
+				t.Fatalf("runCombinerTests len(messages)[%d] != len(expected)[%d]", len(test.messages), len(test.expected))
+			}
+			if len(test.messages) != len(test.satisfied) {
+				t.Fatalf("runCombinerTests len(messages)[%d] != len(satisfied)[%d]", len(test.messages), len(test.satisfied))
+			}
+
 			t.Parallel()
 
 			matcher := makeCombiner()
@@ -110,9 +110,9 @@ func Test_AllOf(t *testing.T) {
 	runCombinerTests(t, makeCombiner, tests)
 }
 
-func Test_AtLeastN(t *testing.T) {
+func Test_AtLeastNOfEach(t *testing.T) {
 	makeCombiner := func() chanassert.ExpectCombiner[string] {
-		return chanassert.AtLeastNOf(3,
+		return chanassert.AtLeastNOfEach(3,
 			chanassert.MatchEqual("hello"),
 			chanassert.MatchEqual("world"),
 		)
@@ -153,9 +153,9 @@ func Test_AtLeastN(t *testing.T) {
 	runCombinerTests(t, makeCombiner, tests)
 }
 
-func Test_BetweenN(t *testing.T) {
+func Test_BetweenNOfEach(t *testing.T) {
 	makeCombiner := func() chanassert.ExpectCombiner[string] {
-		return chanassert.BetweenNOf(3, 5,
+		return chanassert.BetweenNOfEach(3, 5,
 			chanassert.MatchEqual("hello"),
 			chanassert.MatchEqual("world"),
 		)
@@ -176,8 +176,8 @@ func Test_BetweenN(t *testing.T) {
 		{
 			summary:   "Greater than max messages",
 			messages:  []string{"hello", "hello", "hello", "hello", "hello", "world", "world", "world", "world", "world", "hello", "world"},
-			expected:  []bool{true, true, true, true, true, true, true, true, true, true, true, true},
-			satisfied: []bool{false, false, false, false, false, false, false, true, true, true, false, false},
+			expected:  []bool{true, true, true, true, true, true, true, true, true, true, false, false},
+			satisfied: []bool{false, false, false, false, false, false, false, true, true, true, true, true},
 		},
 		{
 			summary:   "Less than min messages",
@@ -194,8 +194,8 @@ func Test_BetweenN(t *testing.T) {
 		{
 			summary:   "One matcher within bounds, other too high",
 			messages:  []string{"hello", "hello", "hello", "hello", "world", "world", "world", "world", "world", "world"},
-			expected:  []bool{true, true, true, true, true, true, true, true, true, true},
-			satisfied: []bool{false, false, false, false, false, false, true, true, true, false},
+			expected:  []bool{true, true, true, true, true, true, true, true, true, false},
+			satisfied: []bool{false, false, false, false, false, false, true, true, true, true},
 		},
 		{
 			summary:   "Non-matching messages do not affect satisfaction",
@@ -208,9 +208,9 @@ func Test_BetweenN(t *testing.T) {
 	runCombinerTests(t, makeCombiner, tests)
 }
 
-func Test_ExactlyN(t *testing.T) {
+func Test_ExactlyNOfEach(t *testing.T) {
 	makeCombiner := func() chanassert.ExpectCombiner[string] {
-		return chanassert.ExactlyNOf(2,
+		return chanassert.ExactlyNOfEach(2,
 			chanassert.MatchEqual("hello"),
 			chanassert.MatchEqual("world"),
 		)
@@ -225,8 +225,51 @@ func Test_ExactlyN(t *testing.T) {
 		{
 			summary:   "Greater than N messages",
 			messages:  []string{"hello", "world", "hello", "world", "hello"},
-			expected:  []bool{true, true, true, true, true},
-			satisfied: []bool{false, false, false, true, false},
+			expected:  []bool{true, true, true, true, false},
+			satisfied: []bool{false, false, false, true, true},
+		},
+		{
+			summary:   "Less than N messages",
+			messages:  []string{"hello", "world"},
+			expected:  []bool{true, true},
+			satisfied: []bool{false, false},
+		},
+		{
+			summary:   "Only one matcher satisfied",
+			messages:  []string{"hello", "hello", "hello", "hello"},
+			expected:  []bool{true, true, false, false},
+			satisfied: []bool{false, false, false, false},
+		},
+		{
+			summary:   "Non-matching messages do not affect satisfaction",
+			messages:  []string{"hello", "world", "FOO", "hello", "world", "BAR"},
+			expected:  []bool{true, true, false, true, true, false},
+			satisfied: []bool{false, false, false, false, true, true},
+		},
+	}
+
+	runCombinerTests(t, makeCombiner, tests)
+}
+
+func Test_AtLeastNOf(t *testing.T) {
+	makeCombiner := func() chanassert.ExpectCombiner[string] {
+		return chanassert.AtLeastNOf(3,
+			chanassert.MatchEqual("hello"),
+			chanassert.MatchEqual("world"),
+		)
+	}
+	tests := []combinerTest[string]{
+		{
+			summary:   "Exactly N messages",
+			messages:  []string{"hello", "world", "hello"},
+			expected:  []bool{true, true, true},
+			satisfied: []bool{false, false, true},
+		},
+		{
+			summary:   "Greater than N messages",
+			messages:  []string{"hello", "hello", "world", "hello", "hello", "world", "world", "world", "hello"},
+			expected:  []bool{true, true, true, true, true, true, true, true, true},
+			satisfied: []bool{false, false, true, true, true, true, true, true, true},
 		},
 		{
 			summary:   "Less than N messages",
@@ -238,13 +281,270 @@ func Test_ExactlyN(t *testing.T) {
 			summary:   "Only one matcher satisfied",
 			messages:  []string{"hello", "hello", "hello", "hello"},
 			expected:  []bool{true, true, true, true},
-			satisfied: []bool{false, false, false, false},
+			satisfied: []bool{false, false, true, true},
+		},
+		{
+			summary:   "Non-matching messages do not affect satisfaction",
+			messages:  []string{"hello", "FOO", "world", "hello", "BAR", "hello", "world", "world"},
+			expected:  []bool{true, false, true, true, false, true, true, true},
+			satisfied: []bool{false, false, false, true, true, true, true, true},
+		},
+	}
+
+	runCombinerTests(t, makeCombiner, tests)
+}
+
+func Test_BetweenNOf(t *testing.T) {
+	makeCombiner := func() chanassert.ExpectCombiner[string] {
+		return chanassert.BetweenNOf(3, 5,
+			chanassert.MatchEqual("hello"),
+			chanassert.MatchEqual("world"),
+		)
+	}
+	tests := []combinerTest[string]{
+		{
+			summary:   "Exactly min messages",
+			messages:  []string{"hello", "hello", "world"},
+			expected:  []bool{true, true, true},
+			satisfied: []bool{false, false, true},
+		},
+		{
+			summary:   "Exactly max messages",
+			messages:  []string{"hello", "hello", "world", "hello", "hello"},
+			expected:  []bool{true, true, true, true, true},
+			satisfied: []bool{false, false, true, true, true},
+		},
+		{
+			summary:   "Greater than max messages",
+			messages:  []string{"hello", "hello", "hello", "hello", "hello", "world", "world", "world", "world", "world", "hello", "world"},
+			expected:  []bool{true, true, true, true, true, false, false, false, false, false, false, false},
+			satisfied: []bool{false, false, true, true, true, true, true, true, true, true, true, true},
+		},
+		{
+			summary:   "Less than min messages",
+			messages:  []string{"hello", "world"},
+			expected:  []bool{true, true},
+			satisfied: []bool{false, false},
+		},
+		{
+			summary:   "One matcher within bounds, other too low",
+			messages:  []string{"hello", "hello", "hello", "hello", "world"},
+			expected:  []bool{true, true, true, true, true},
+			satisfied: []bool{false, false, true, true, true},
+		},
+		{
+			summary:   "One matcher within bounds, other too high",
+			messages:  []string{"hello", "hello", "hello", "hello", "world", "world", "world", "world", "world", "world"},
+			expected:  []bool{true, true, true, true, true, false, false, false, false, false},
+			satisfied: []bool{false, false, true, true, true, true, true, true, true, true},
+		},
+		{
+			summary:   "Non-matching messages do not affect satisfaction",
+			messages:  []string{"hello", "FOO", "hello", "hello", "hello", "hello", "world", "world", "world", "BAR", "world", "world"},
+			expected:  []bool{true, false, true, true, true, true, false, false, false, false, false, false},
+			satisfied: []bool{false, false, false, true, true, true, true, true, true, true, true, true},
+		},
+	}
+
+	runCombinerTests(t, makeCombiner, tests)
+}
+
+func Test_ExactlyNOf(t *testing.T) {
+	makeCombiner := func() chanassert.ExpectCombiner[string] {
+		return chanassert.ExactlyNOf(2,
+			chanassert.MatchEqual("hello"),
+			chanassert.MatchEqual("world"),
+		)
+	}
+	tests := []combinerTest[string]{
+		{
+			summary:   "Exactly N messages",
+			messages:  []string{"hello", "world"},
+			expected:  []bool{true, true},
+			satisfied: []bool{false, true},
+		},
+		{
+			summary:   "Greater than N messages",
+			messages:  []string{"hello", "world", "hello", "world", "hello"},
+			expected:  []bool{true, true, false, false, false},
+			satisfied: []bool{false, true, true, true, true},
+		},
+		{
+			summary:   "Less than N messages",
+			messages:  []string{"hello"},
+			expected:  []bool{true},
+			satisfied: []bool{false},
+		},
+		{
+			summary:   "Only one matcher satisfied",
+			messages:  []string{"hello", "hello", "hello", "hello"},
+			expected:  []bool{true, true, false, false},
+			satisfied: []bool{false, true, true, true},
 		},
 		{
 			summary:   "Non-matching messages do not affect satisfaction",
 			messages:  []string{"hello", "world", "FOO", "hello", "world", "BAR"},
-			expected:  []bool{true, true, false, true, true, false},
+			expected:  []bool{true, true, false, false, false, false},
+			satisfied: []bool{false, true, true, true, true, true},
+		},
+	}
+
+	runCombinerTests(t, makeCombiner, tests)
+}
+
+func Test_AtLeastNOfAny(t *testing.T) {
+	makeCombiner := func() chanassert.ExpectCombiner[string] {
+		return chanassert.AtLeastNOfAny(3,
+			chanassert.MatchEqual("hello"),
+			chanassert.MatchEqual("world"),
+		)
+	}
+	tests := []combinerTest[string]{
+		{
+			summary:   "Exactly N messages of first matcher",
+			messages:  []string{"hello", "world", "hello", "hello"},
+			expected:  []bool{true, true, true, true},
+			satisfied: []bool{false, false, false, true},
+		},
+		{
+			summary:   "Exactly N messages of second matcher",
+			messages:  []string{"hello", "world", "world", "hello", "world"},
+			expected:  []bool{true, true, true, true, true},
+			satisfied: []bool{false, false, false, false, true},
+		},
+		{
+			summary:   "Exactly N messages of both",
+			messages:  []string{"hello", "hello", "world", "world", "hello", "hello"},
+			expected:  []bool{true, true, true, true, true, true},
 			satisfied: []bool{false, false, false, false, true, true},
+		},
+		{
+			summary:   "Greater than N of first matcher",
+			messages:  []string{"hello", "hello", "hello", "hello"},
+			expected:  []bool{true, true, true, true},
+			satisfied: []bool{false, false, true, true},
+		},
+		{
+			summary:   "Greater than N of second matcher",
+			messages:  []string{"world", "world", "world", "world"},
+			expected:  []bool{true, true, true, true},
+			satisfied: []bool{false, false, true, true},
+		},
+		{
+			summary:   "Greater than N of both matchers",
+			messages:  []string{"hello", "world", "hello", "world", "hello", "world", "hello", "world"},
+			expected:  []bool{true, true, true, true, true, true, true, true},
+			satisfied: []bool{false, false, false, false, true, true, true, true},
+		},
+		{
+			summary:   "Less than N messages",
+			messages:  []string{"hello", "world"},
+			expected:  []bool{true, true},
+			satisfied: []bool{false, false},
+		},
+		{
+			summary:   "Non-matching messages do not affect satisfaction",
+			messages:  []string{"hello", "foo", "hello", "world", "world", "hello", "bar", "hello"},
+			expected:  []bool{true, false, true, true, true, true, false, true},
+			satisfied: []bool{false, false, false, false, false, true, true, true},
+		},
+	}
+
+	runCombinerTests(t, makeCombiner, tests)
+}
+
+func Test_BetweenNOfAny(t *testing.T) {
+	makeCombiner := func() chanassert.ExpectCombiner[string] {
+		return chanassert.BetweenNOfAny(3, 5,
+			chanassert.MatchEqual("hello"),
+			chanassert.MatchEqual("world"),
+		)
+	}
+	tests := []combinerTest[string]{
+		{
+			summary:   "Exactly min messages of first matcher",
+			messages:  []string{"hello", "world", "hello", "world", "hello"},
+			expected:  []bool{true, true, true, true, true},
+			satisfied: []bool{false, false, false, false, true},
+		},
+		{
+			summary:   "Exactly min messages of second matcher",
+			messages:  []string{"world", "hello", "world", "hello", "world"},
+			expected:  []bool{true, true, true, true, true},
+			satisfied: []bool{false, false, false, false, true},
+		},
+		{
+			summary:   "Exactly max messages of first matcher",
+			messages:  []string{"hello", "hello", "hello", "world", "world", "world", "hello", "hello"},
+			expected:  []bool{true, true, true, true, true, true, true, true},
+			satisfied: []bool{false, false, true, true, true, true, true, true},
+		},
+		{
+			summary:   "Exactly max messages of second matcher",
+			messages:  []string{"world", "world", "world", "hello", "hello", "hello", "world", "world"},
+			expected:  []bool{true, true, true, true, true, true, true, true},
+			satisfied: []bool{false, false, true, true, true, true, true, true},
+		},
+		{
+			summary:   "Greater than max messages of first matcher, below min for second matcher",
+			messages:  []string{"hello", "hello", "hello", "world", "hello", "hello", "hello"},
+			expected:  []bool{true, true, true, true, true, true, false},
+			satisfied: []bool{false, false, true, true, true, true, true},
+		},
+		{
+			summary:   "Greater than max messages of second matcher, below min for first matcher",
+			messages:  []string{"world", "world", "world", "hello", "hello", "world", "world", "world"},
+			expected:  []bool{true, true, true, true, true, true, true, false},
+			satisfied: []bool{false, false, true, true, true, true, true, true},
+		},
+		{
+			summary:   "One matcher within bounds, other too low",
+			messages:  []string{"hello", "world", "hello", "world", "hello", "hello"},
+			expected:  []bool{true, true, true, true, true, true},
+			satisfied: []bool{false, false, false, false, true, true},
+		},
+		{
+			summary:   "One matcher within bounds, other too high",
+			messages:  []string{"hello", "hello", "hello", "hello", "world", "world", "world", "world", "world", "world"},
+			expected:  []bool{true, true, true, true, true, true, true, true, true, false},
+			satisfied: []bool{false, false, true, true, true, true, true, true, true, true},
+		},
+	}
+
+	runCombinerTests(t, makeCombiner, tests)
+}
+
+func Test_ExactlyNOfAny(t *testing.T) {
+	makeCombiner := func() chanassert.ExpectCombiner[string] {
+		return chanassert.ExactlyNOfAny(2,
+			chanassert.MatchEqual("hello"),
+			chanassert.MatchEqual("world"),
+		)
+	}
+	tests := []combinerTest[string]{
+		{
+			summary:   "Exactly N messages of first matcher",
+			messages:  []string{"hello", "hello"},
+			expected:  []bool{true, true},
+			satisfied: []bool{false, true},
+		},
+		{
+			summary:   "Exactly N messages of second matcher",
+			messages:  []string{"world", "world"},
+			expected:  []bool{true, true},
+			satisfied: []bool{false, true},
+		},
+		{
+			summary:   "Greater than N messages of first matcher, N messages of second",
+			messages:  []string{"hello", "world", "hello", "hello", "world"},
+			expected:  []bool{true, true, true, false, false},
+			satisfied: []bool{false, false, true, true, true},
+		},
+		{
+			summary:   "Less than N messages of first matcher, N messages of second",
+			messages:  []string{"hello", "world", "world"},
+			expected:  []bool{true, true, true},
+			satisfied: []bool{false, false, true},
 		},
 	}
 

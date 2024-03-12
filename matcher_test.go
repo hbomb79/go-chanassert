@@ -3,7 +3,7 @@ package chanassert_test
 import (
 	"testing"
 
-	"chanassert"
+	"github.com/hbomb79/go-chanassert"
 )
 
 type matcherTest[T any] struct {

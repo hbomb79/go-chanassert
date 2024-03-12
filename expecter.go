@@ -89,14 +89,14 @@ func (exp *channelExpecter[T]) Ignore(matchers ...Matcher[T]) Expecter[T] {
 }
 
 func (exp *channelExpecter[T]) Expect(matcher ExpectCombiner[T]) Expecter[T] {
-	layer := &simpleLayer[T]{layerIdx: len(exp.expectLayers), matcher: matcher, errors: make([]error, 0)}
+	layer := &simpleLayer[T]{layerIdx: len(exp.expectLayers), combiner: matcher, errors: make([]error, 0)}
 	exp.expectLayers = append(exp.expectLayers, layer)
 
 	return exp
 }
 
 func (exp *channelExpecter[T]) ExpectTimeout(timeout time.Duration, matcher ExpectCombiner[T]) Expecter[T] {
-	layer := &timeoutLayer[T]{layerIdx: len(exp.expectLayers), timeout: timeout, matcher: matcher, errors: make([]error, 0)}
+	layer := &timeoutLayer[T]{layerIdx: len(exp.expectLayers), timeout: timeout, combiner: matcher, errors: make([]error, 0)}
 	exp.expectLayers = append(exp.expectLayers, layer)
 
 	return exp

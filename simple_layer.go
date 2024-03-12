@@ -4,7 +4,7 @@ import "fmt"
 
 type simpleLayer[T any] struct {
 	layerIdx int
-	matcher  ExpectCombiner[T]
+	combiner ExpectCombiner[T]
 	errors   []error
 }
 
@@ -13,7 +13,7 @@ func (layer *simpleLayer[T]) Begin() {
 }
 
 func (layer *simpleLayer[T]) DoesMatch(t T) bool {
-	if layer.matcher.DoesMatch(t) {
+	if layer.combiner.DoesMatch(t) {
 		return true
 	}
 
@@ -22,6 +22,6 @@ func (layer *simpleLayer[T]) DoesMatch(t T) bool {
 }
 
 func (layer *simpleLayer[T]) IsSatisfied() bool {
-	return layer.matcher.IsSatisfied()
+	return layer.combiner.IsSatisfied()
 }
 func (layer *simpleLayer[T]) Errors() []error { return layer.errors }

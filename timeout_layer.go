@@ -9,7 +9,7 @@ type timeoutLayer[T any] struct {
 	layerIdx  int
 	startTime *time.Time
 	timeout   time.Duration
-	matcher   ExpectCombiner[T]
+	combiner  ExpectCombiner[T]
 	errors    []error
 }
 
@@ -28,7 +28,7 @@ func (layer *timeoutLayer[T]) DoesMatch(t T) bool {
 		return false
 	}
 
-	if layer.matcher.DoesMatch(t) {
+	if layer.combiner.DoesMatch(t) {
 		return true
 	}
 
@@ -36,5 +36,5 @@ func (layer *timeoutLayer[T]) DoesMatch(t T) bool {
 	return false
 }
 
-func (layer *timeoutLayer[T]) IsSatisfied() bool { return layer.matcher.IsSatisfied() }
+func (layer *timeoutLayer[T]) IsSatisfied() bool { return layer.combiner.IsSatisfied() }
 func (layer *timeoutLayer[T]) Errors() []error   { return layer.errors }

@@ -229,6 +229,7 @@ func Test_MatchStruct(t *testing.T) {
 	runMatcherTests(t, matcher, tests)
 }
 
+//nolint:funlen
 func Test_MatchStructFields(t *testing.T) {
 	t.Run("Testing private fields will always return false", func(t *testing.T) {
 		type s struct {

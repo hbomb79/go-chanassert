@@ -8,8 +8,8 @@ import (
 type LayerMode int
 
 const (
-	And LayerMode = iota
-	Or
+	and LayerMode = iota
+	or
 )
 
 type layer[T any] struct {
@@ -26,7 +26,7 @@ type layer[T any] struct {
 func (layer *layer[T]) updateSatisfied() {
 	//exhaustive:enforce
 	switch layer.mode {
-	case And:
+	case and:
 		// In 'And' mode, the layer becomes satisfied once all
 		// combiners are satisfied
 		for _, combiner := range layer.combiners {
@@ -37,7 +37,7 @@ func (layer *layer[T]) updateSatisfied() {
 		}
 
 		layer.satisfied = true
-	case Or:
+	case or:
 		// In 'Or' mode, the layer becomes satisfied any combiner
 		// is satisfied
 		for _, combiner := range layer.combiners {
@@ -54,7 +54,7 @@ func (layer *layer[T]) updateSatisfied() {
 func (layer *layer[T]) DoesMatch(message T) bool {
 	if layer.timeout != nil {
 		if time.Until(*layer.timeout) <= 0 {
-			layer.errors = append(layer.errors, fmt.Errorf("message %v (%T) received, but timeout (%s) has been exceeded", message, message, layer.timeout))
+			layer.errors = append(layer.errors, fmt.Errorf("message %v (%T) received, but timeout has been exceeded", message, message))
 			return false
 		}
 	}

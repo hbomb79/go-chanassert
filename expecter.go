@@ -24,7 +24,7 @@ type Layer[T any] interface {
 	// DoesMatch is called by the Expecter on a layer when a message is received. This method
 	// must return true if the message is valid for the layer, otherwise false. A 'Valid' message is
 	// determined by the specific layer implementation (e.g. timeoutLayer)
-	DoesMatch(t T) bool
+	DoesMatch(message T) bool
 
 	// IsSatisfied must return true if the layer does not intend to accept any more messages. Typically
 	// a layer will NOT return true if it's in an error condition, however this is implementation specific.
@@ -107,25 +107,25 @@ func (exp *expecter[T]) addLayer(mode LayerMode, timeout *time.Duration, combine
 }
 
 func (exp *expecter[T]) ExpectAny(combiners ...Combiner[T]) Expecter[T] {
-	return exp.addLayer(Or, nil, combiners)
+	return exp.addLayer(or, nil, combiners)
 }
 
 func (exp *expecter[T]) ExpectAnyTimeout(timeout time.Duration, combiners ...Combiner[T]) Expecter[T] {
-	return exp.addLayer(Or, &timeout, combiners)
+	return exp.addLayer(or, &timeout, combiners)
 }
 
 func (exp *expecter[T]) Expect(combiners ...Combiner[T]) Expecter[T] {
-	return exp.addLayer(And, nil, combiners)
+	return exp.addLayer(and, nil, combiners)
 }
 
 func (exp *expecter[T]) ExpectTimeout(timeout time.Duration, combiners ...Combiner[T]) Expecter[T] {
-	return exp.addLayer(And, &timeout, combiners)
+	return exp.addLayer(and, &timeout, combiners)
 }
 
 func (exp *expecter[T]) Satisfied(timeout time.Duration) Errors {
 	outErr := make([]error, 0)
 	reportErr := func(err error) {
-		outErr = append(outErr, fmt.Errorf("expecter error: %w", err))
+		outErr = append(outErr, err)
 	}
 
 	// Wait for the listen loop to close, up to timeout. Otherwise, close it manually
@@ -137,7 +137,7 @@ func (exp *expecter[T]) Satisfied(timeout time.Duration) Errors {
 
 	select {
 	case <-time.NewTimer(timeout).C:
-		reportErr(errors.New("expecter did not finish within timeout"))
+		reportErr(errors.New("expecter did not become satisfied within timeout"))
 		exp.closeChan <- struct{}{}
 		<-finished
 	case <-finished:
@@ -153,7 +153,7 @@ func (exp *expecter[T]) Satisfied(timeout time.Duration) Errors {
 		maybeLayer := exp.expectLayers[exp.currentLayer]
 		if maybeLayer != nil {
 			if !maybeLayer.IsSatisfied() {
-				reportErr(fmt.Errorf("layer #%d is not yet satisfied", exp.currentLayer))
+				reportErr(fmt.Errorf("layer #%d did not become satisfied", exp.currentLayer))
 			}
 		}
 	}

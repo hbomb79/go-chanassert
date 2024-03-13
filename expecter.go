@@ -11,20 +11,16 @@ import (
 	"time"
 )
 
-type ExpectCombiner[T any] interface {
+type Combiner[T any] interface {
 	DoesMatch(t T) bool
 	IsSatisfied() bool
 }
 
-// ExpectLayer is the highest-level of matcher abstraction, and it defines
+// Layer is the highest-level of matcher abstraction, and it defines
 // a specific matcher which can be selected by the expecter at any one time. Each
 // time a new ExpectMatcher is provided to the Expecter, it is placed in it's own
 // layer. This is what gives the expecter the "expect this THEN this THEN this" pattern.
-type ExpectLayer[T any] interface {
-	// Begin is called when the layer is selected. This allows a layer to perform
-	// any logic which is best done when the previous layer has completed.
-	Begin()
-
+type Layer[T any] interface {
 	// DoesMatch is called by the Expecter on a layer when a message is received. This method
 	// must return true if the message is valid for the layer, otherwise false. A 'Valid' message is
 	// determined by the specific layer implementation (e.g. timeoutLayer)
@@ -42,9 +38,9 @@ type ExpectLayer[T any] interface {
 	Errors() []error
 }
 
-type ExpecterErrors []error
+type Errors []error
 
-func (errs ExpecterErrors) String() string {
+func (errs Errors) String() string {
 	str := "ExpecterErrors {\n"
 	for _, e := range errs {
 		str += fmt.Sprintf("  - %s\n", e)
@@ -56,53 +52,65 @@ func (errs ExpecterErrors) String() string {
 
 type Expecter[T any] interface {
 	Ignore(matchers ...Matcher[T]) Expecter[T]
-	Expect(layer ExpectCombiner[T]) Expecter[T]
-	ExpectTimeout(timeout time.Duration, layer ExpectCombiner[T]) Expecter[T]
+	Expect(layer Combiner[T]) Expecter[T]
+	ExpectTimeout(timeout time.Duration, layer Combiner[T]) Expecter[T]
 	AssertSatisfied(t *testing.T, timeout time.Duration)
-	Satisfied(timeout time.Duration) ExpecterErrors
+	Satisfied(timeout time.Duration) Errors
 	Listen()
 }
 
-type channelExpecter[T any] struct {
+type expecter[T any] struct {
 	channel        chan T
 	ignoreMatchers []Matcher[T]
 	currentLayer   int
-	expectLayers   []ExpectLayer[T]
+	expectLayers   []Layer[T]
 	wg             *sync.WaitGroup
 	closeChan      chan struct{}
 }
 
-func NewChannelExpecter[T any](channel chan T) *channelExpecter[T] {
-	return &channelExpecter[T]{
+func NewChannelExpecter[T any](channel chan T) *expecter[T] {
+	return &expecter[T]{
 		channel:        channel,
 		currentLayer:   0,
 		ignoreMatchers: make([]Matcher[T], 0),
-		expectLayers:   make([]ExpectLayer[T], 0),
+		expectLayers:   make([]Layer[T], 0),
 		closeChan:      make(chan struct{}, 1),
 		wg:             &sync.WaitGroup{},
 	}
 }
 
-func (exp *channelExpecter[T]) Ignore(matchers ...Matcher[T]) Expecter[T] {
+func (exp *expecter[T]) Ignore(matchers ...Matcher[T]) Expecter[T] {
 	exp.ignoreMatchers = append(exp.ignoreMatchers, matchers...)
 	return exp
 }
 
-func (exp *channelExpecter[T]) Expect(matcher ExpectCombiner[T]) Expecter[T] {
-	layer := &simpleLayer[T]{layerIdx: len(exp.expectLayers), combiner: matcher, errors: make([]error, 0)}
-	exp.expectLayers = append(exp.expectLayers, layer)
+func (exp *expecter[T]) Expect(matcher Combiner[T]) Expecter[T] {
+	layer := &layer[T]{
+		mode:      And,
+		layerIdx:  len(exp.expectLayers),
+		combiners: []Combiner[T]{matcher},
+		errors:    make([]error, 0),
+	}
 
+	exp.expectLayers = append(exp.expectLayers, layer)
 	return exp
 }
 
-func (exp *channelExpecter[T]) ExpectTimeout(timeout time.Duration, matcher ExpectCombiner[T]) Expecter[T] {
-	layer := &timeoutLayer[T]{layerIdx: len(exp.expectLayers), timeout: timeout, combiner: matcher, errors: make([]error, 0)}
-	exp.expectLayers = append(exp.expectLayers, layer)
+func (exp *expecter[T]) ExpectTimeout(timeout time.Duration, matcher Combiner[T]) Expecter[T] {
+	timeoutTime := time.Now().Add(timeout)
+	layer := &layer[T]{
+		mode:      And,
+		layerIdx:  len(exp.expectLayers),
+		combiners: []Combiner[T]{matcher},
+		errors:    make([]error, 0),
+		timeout:   &timeoutTime,
+	}
 
+	exp.expectLayers = append(exp.expectLayers, layer)
 	return exp
 }
 
-func (exp *channelExpecter[T]) Satisfied(timeout time.Duration) ExpecterErrors {
+func (exp *expecter[T]) Satisfied(timeout time.Duration) Errors {
 	outErr := make([]error, 0)
 	reportErr := func(err error) {
 		outErr = append(outErr, fmt.Errorf("expecter error: %w", err))
@@ -141,7 +149,7 @@ func (exp *channelExpecter[T]) Satisfied(timeout time.Duration) ExpecterErrors {
 	return outErr
 }
 
-func (exp *channelExpecter[T]) AssertSatisfied(t *testing.T, timeout time.Duration) {
+func (exp *expecter[T]) AssertSatisfied(t *testing.T, timeout time.Duration) {
 	errors := exp.Satisfied(timeout)
 
 	for _, e := range errors {
@@ -153,7 +161,7 @@ func (exp *channelExpecter[T]) AssertSatisfied(t *testing.T, timeout time.Durati
 	}
 }
 
-func (exp *channelExpecter[T]) Listen() {
+func (exp *expecter[T]) Listen() {
 	if len(exp.expectLayers) == 0 {
 		panic("no layers specified")
 	}
@@ -178,9 +186,7 @@ func (exp *channelExpecter[T]) Listen() {
 				return
 			}
 
-			// TODO: maybe be smarter and not call this every time
 			layer := exp.expectLayers[exp.currentLayer]
-			layer.Begin()
 
 			select {
 			case <-exp.closeChan:

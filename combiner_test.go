@@ -13,7 +13,7 @@ type combinerTest[T any] struct {
 	satisfied []bool
 }
 
-func runCombinerTests[T any](t *testing.T, makeCombiner func() chanassert.ExpectCombiner[T], tests []combinerTest[T]) {
+func runCombinerTests[T any](t *testing.T, makeCombiner func() chanassert.Combiner[T], tests []combinerTest[T]) {
 	for _, test := range tests {
 		t.Run(test.summary, func(t *testing.T) {
 			if len(test.messages) != len(test.expected) {
@@ -49,7 +49,7 @@ func runCombinerTests[T any](t *testing.T, makeCombiner func() chanassert.Expect
 }
 
 func Test_OneOf(t *testing.T) {
-	makeCombiner := func() chanassert.ExpectCombiner[string] {
+	makeCombiner := func() chanassert.Combiner[string] {
 		return chanassert.OneOf(
 			chanassert.MatchEqual("hello"),
 			chanassert.MatchEqual("world"),
@@ -80,7 +80,7 @@ func Test_OneOf(t *testing.T) {
 }
 
 func Test_AllOf(t *testing.T) {
-	makeCombiner := func() chanassert.ExpectCombiner[string] {
+	makeCombiner := func() chanassert.Combiner[string] {
 		return chanassert.AllOf(
 			chanassert.MatchEqual("hello"),
 			chanassert.MatchEqual("world"),
@@ -111,7 +111,7 @@ func Test_AllOf(t *testing.T) {
 }
 
 func Test_AtLeastNOfEach(t *testing.T) {
-	makeCombiner := func() chanassert.ExpectCombiner[string] {
+	makeCombiner := func() chanassert.Combiner[string] {
 		return chanassert.AtLeastNOfEach(3,
 			chanassert.MatchEqual("hello"),
 			chanassert.MatchEqual("world"),
@@ -154,7 +154,7 @@ func Test_AtLeastNOfEach(t *testing.T) {
 }
 
 func Test_BetweenNOfEach(t *testing.T) {
-	makeCombiner := func() chanassert.ExpectCombiner[string] {
+	makeCombiner := func() chanassert.Combiner[string] {
 		return chanassert.BetweenNOfEach(3, 5,
 			chanassert.MatchEqual("hello"),
 			chanassert.MatchEqual("world"),
@@ -209,7 +209,7 @@ func Test_BetweenNOfEach(t *testing.T) {
 }
 
 func Test_ExactlyNOfEach(t *testing.T) {
-	makeCombiner := func() chanassert.ExpectCombiner[string] {
+	makeCombiner := func() chanassert.Combiner[string] {
 		return chanassert.ExactlyNOfEach(2,
 			chanassert.MatchEqual("hello"),
 			chanassert.MatchEqual("world"),
@@ -252,7 +252,7 @@ func Test_ExactlyNOfEach(t *testing.T) {
 }
 
 func Test_AtLeastNOf(t *testing.T) {
-	makeCombiner := func() chanassert.ExpectCombiner[string] {
+	makeCombiner := func() chanassert.Combiner[string] {
 		return chanassert.AtLeastNOf(3,
 			chanassert.MatchEqual("hello"),
 			chanassert.MatchEqual("world"),
@@ -295,7 +295,7 @@ func Test_AtLeastNOf(t *testing.T) {
 }
 
 func Test_BetweenNOf(t *testing.T) {
-	makeCombiner := func() chanassert.ExpectCombiner[string] {
+	makeCombiner := func() chanassert.Combiner[string] {
 		return chanassert.BetweenNOf(3, 5,
 			chanassert.MatchEqual("hello"),
 			chanassert.MatchEqual("world"),
@@ -350,7 +350,7 @@ func Test_BetweenNOf(t *testing.T) {
 }
 
 func Test_ExactlyNOf(t *testing.T) {
-	makeCombiner := func() chanassert.ExpectCombiner[string] {
+	makeCombiner := func() chanassert.Combiner[string] {
 		return chanassert.ExactlyNOf(2,
 			chanassert.MatchEqual("hello"),
 			chanassert.MatchEqual("world"),
@@ -393,7 +393,7 @@ func Test_ExactlyNOf(t *testing.T) {
 }
 
 func Test_AtLeastNOfAny(t *testing.T) {
-	makeCombiner := func() chanassert.ExpectCombiner[string] {
+	makeCombiner := func() chanassert.Combiner[string] {
 		return chanassert.AtLeastNOfAny(3,
 			chanassert.MatchEqual("hello"),
 			chanassert.MatchEqual("world"),
@@ -454,7 +454,7 @@ func Test_AtLeastNOfAny(t *testing.T) {
 }
 
 func Test_BetweenNOfAny(t *testing.T) {
-	makeCombiner := func() chanassert.ExpectCombiner[string] {
+	makeCombiner := func() chanassert.Combiner[string] {
 		return chanassert.BetweenNOfAny(3, 5,
 			chanassert.MatchEqual("hello"),
 			chanassert.MatchEqual("world"),
@@ -515,7 +515,7 @@ func Test_BetweenNOfAny(t *testing.T) {
 }
 
 func Test_ExactlyNOfAny(t *testing.T) {
-	makeCombiner := func() chanassert.ExpectCombiner[string] {
+	makeCombiner := func() chanassert.Combiner[string] {
 		return chanassert.ExactlyNOfAny(2,
 			chanassert.MatchEqual("hello"),
 			chanassert.MatchEqual("world"),

@@ -51,11 +51,16 @@ func (errs Errors) String() string {
 }
 
 type Expecter[T any] interface {
+	ExpectAny(combiners ...Combiner[T]) Expecter[T]
+	Expect(combiners ...Combiner[T]) Expecter[T]
+	ExpectAnyTimeout(timeout time.Duration, combiners ...Combiner[T]) Expecter[T]
+	ExpectTimeout(timeout time.Duration, combiners ...Combiner[T]) Expecter[T]
+
 	Ignore(matchers ...Matcher[T]) Expecter[T]
-	Expect(layer Combiner[T]) Expecter[T]
-	ExpectTimeout(timeout time.Duration, layer Combiner[T]) Expecter[T]
+
 	AssertSatisfied(t *testing.T, timeout time.Duration)
 	Satisfied(timeout time.Duration) Errors
+
 	Listen()
 }
 
@@ -84,30 +89,37 @@ func (exp *expecter[T]) Ignore(matchers ...Matcher[T]) Expecter[T] {
 	return exp
 }
 
-func (exp *expecter[T]) Expect(matcher Combiner[T]) Expecter[T] {
+func (exp *expecter[T]) addLayer(mode LayerMode, timeout *time.Duration, combiners []Combiner[T]) Expecter[T] {
 	layer := &layer[T]{
-		mode:      And,
+		mode:      mode,
 		layerIdx:  len(exp.expectLayers),
-		combiners: []Combiner[T]{matcher},
+		combiners: combiners,
 		errors:    make([]error, 0),
+	}
+
+	if timeout != nil {
+		timeoutTime := time.Now().Add(*timeout)
+		layer.timeout = &timeoutTime
 	}
 
 	exp.expectLayers = append(exp.expectLayers, layer)
 	return exp
 }
 
-func (exp *expecter[T]) ExpectTimeout(timeout time.Duration, matcher Combiner[T]) Expecter[T] {
-	timeoutTime := time.Now().Add(timeout)
-	layer := &layer[T]{
-		mode:      And,
-		layerIdx:  len(exp.expectLayers),
-		combiners: []Combiner[T]{matcher},
-		errors:    make([]error, 0),
-		timeout:   &timeoutTime,
-	}
+func (exp *expecter[T]) ExpectAny(combiners ...Combiner[T]) Expecter[T] {
+	return exp.addLayer(Or, nil, combiners)
+}
 
-	exp.expectLayers = append(exp.expectLayers, layer)
-	return exp
+func (exp *expecter[T]) ExpectAnyTimeout(timeout time.Duration, combiners ...Combiner[T]) Expecter[T] {
+	return exp.addLayer(Or, &timeout, combiners)
+}
+
+func (exp *expecter[T]) Expect(combiners ...Combiner[T]) Expecter[T] {
+	return exp.addLayer(And, nil, combiners)
+}
+
+func (exp *expecter[T]) ExpectTimeout(timeout time.Duration, combiners ...Combiner[T]) Expecter[T] {
+	return exp.addLayer(And, &timeout, combiners)
 }
 
 func (exp *expecter[T]) Satisfied(timeout time.Duration) Errors {

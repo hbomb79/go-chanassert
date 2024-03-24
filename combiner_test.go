@@ -29,7 +29,7 @@ func runCombinerTests[T any](t *testing.T, makeCombiner func() chanassert.Combin
 			for i, msg := range test.messages {
 				shouldPass := test.expected[i]
 				shouldBeSatisfied := test.satisfied[i]
-				res := matcher.DoesMatch(msg)
+				res, _ := matcher.TryMatch(msg)
 
 				if shouldPass && !res {
 					t.Errorf("Combiner REJECTED message '%v' (#%d), but it was expected to accept", msg, i)

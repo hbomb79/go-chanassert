@@ -45,12 +45,6 @@ func MatchPredicate[T any](predicate func(T) bool) *predicateMatcher[T] {
 	return &predicateMatcher[T]{predicate: predicate}
 }
 
-type predicateMatcher[T any] struct{ predicate func(T) bool }
-
-func (predMatcher *predicateMatcher[T]) DoesMatch(message T) bool {
-	return predMatcher.predicate(message)
-}
-
 // MatchStructPartial returns a matcher which tests that
 // all non-zero values inside of the provided struct
 // match the same fields inside of the messages received. That is
@@ -101,6 +95,12 @@ type structEqualMatcher[T any] struct{ target T }
 
 func (eqMatch *structEqualMatcher[T]) DoesMatch(t T) bool {
 	return reflect.DeepEqual(t, eqMatch.target)
+}
+
+type predicateMatcher[T any] struct{ predicate func(T) bool }
+
+func (predMatcher *predicateMatcher[T]) DoesMatch(message T) bool {
+	return predMatcher.predicate(message)
 }
 
 type structFieldMatcher[T any] struct{ fieldsAndValues map[string]any }

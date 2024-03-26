@@ -15,7 +15,6 @@ const (
 type layer[T any] struct {
 	combiners []Combiner[T]
 	satisfied bool
-	errors    []error
 
 	mode     LayerMode
 	layerIdx int
@@ -35,8 +34,7 @@ func (layer *layer[T]) Begin() {
 
 func (layer *layer[T]) TryMatch(message T) (bool, TraceMessage) {
 	if layer.timeoutElapsed() {
-		layer.errors = append(layer.errors, fmt.Errorf("message %v (%T) received, but timeout has been exceeded", message, message))
-		return false, newEmptyTrace(fmt.Sprintf("Message %v (%T) REJECTED, timeout of layer (%s) has been reached", message, message, layer.timeout))
+		return false, newInfoTrace(fmt.Sprintf("Message %v (%T) REJECTED, timeout of layer (%s) has been reached", message, message, layer.timeout))
 	}
 
 	defer layer.updateSatisfied()
@@ -47,19 +45,16 @@ func (layer *layer[T]) TryMatch(message T) (bool, TraceMessage) {
 		traces = append(traces, trace)
 
 		if ok {
-			return true, newNestedTrace(fmt.Sprintf("Layer #%d matched message against combiner #%d", layer.layerIdx, idx), traces)
+			return true, newInfoTrace(fmt.Sprintf("Layer #%d matched message against combiner #%d", layer.layerIdx, idx), traces...)
 		}
 	}
 
-	layer.errors = append(layer.errors, fmt.Errorf("message %v (%T) did not match any combiners", message, message))
-	return false, newNestedTrace(fmt.Sprintf("Layer #%d could not match message against any combiners", layer.layerIdx), traces)
+	return false, newInfoTrace(fmt.Sprintf("Layer #%d could not match message against any combiners", layer.layerIdx), traces...)
 }
 
 func (layer *layer[T]) IsSatisfied() bool {
 	return layer.satisfied
 }
-
-func (layer *layer[T]) Errors() []error { return layer.errors }
 
 func (layer *layer[T]) updateSatisfied() {
 	//exhaustive:enforce

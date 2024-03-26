@@ -41,24 +41,22 @@ type Layer[T any] interface {
 	// the next layer in the expecter will be selected.
 	IsSatisfied() bool
 
-	// Errors must return the errors that this layer has witnessed during it's execution. These
-	// errors will be requested when checking if the expecter is satisfied, and the precence of errors
-	// indicates that a layer received messages it was not expecting.
-	Errors() []error
-
 	Begin()
 }
 
 type Errors []error
 
 func (errs Errors) String() string {
-	str := "ExpecterErrors {\n"
+	str := strings.Builder{}
+	str.WriteString("ExpecterErrors {\n")
 	for _, e := range errs {
-		str += fmt.Sprintf("  - %s\n", e)
+		str.WriteString("  - ")
+		str.WriteString(e.Error())
+		str.WriteString("\n")
 	}
-	str += "}\n"
+	str.WriteString("}\n")
 
-	return str
+	return str.String()
 }
 
 type Expecter[T any] interface {
@@ -110,7 +108,6 @@ func (exp *expecter[T]) addLayer(mode LayerMode, timeout *time.Duration, combine
 		mode:      mode,
 		layerIdx:  len(exp.expectLayers),
 		combiners: combiners,
-		errors:    make([]error, 0),
 		timeout:   timeout,
 	}
 
@@ -221,19 +218,19 @@ func (exp *expecter[T]) AssertSatisfied(t *testing.T, timeout time.Duration) {
 	}
 }
 
+func (exp *expecter[T]) shouldIgnoreMessage(message T) (bool, TraceMessage) {
+	for idx, ignore := range exp.ignoreMatchers {
+		if ignore.DoesMatch(message) {
+			return true, newInfoTrace(fmt.Sprintf("Ignore matcher #%d ACCEPTED", idx))
+		}
+	}
+
+	return false, newInfoTrace("")
+}
+
 func (exp *expecter[T]) Listen() {
 	if len(exp.expectLayers) == 0 {
 		panic("no layers specified")
-	}
-
-	shouldIgnore := func(message T) (bool, TraceMessage) {
-		for idx, ignore := range exp.ignoreMatchers {
-			if ignore.DoesMatch(message) {
-				return true, newEmptyTrace(fmt.Sprintf("Ignore matcher #%d ACCEPTED", idx))
-			}
-		}
-
-		return false, newEmptyTrace("")
 	}
 
 	exp.wg.Add(1)
@@ -252,8 +249,13 @@ func (exp *expecter[T]) Listen() {
 			case <-exp.closeChan:
 				return
 			case message := <-exp.channel:
-				if ok, trace := shouldIgnore(message); ok {
-					exp.results = append(exp.results, messageResult[T]{Message: message, Status: ignored, Trace: trace})
+				if ok, trace := exp.shouldIgnoreMessage(message); ok {
+					exp.results = append(exp.results, messageResult[T]{
+						Message: message,
+						Status:  ignored,
+						Trace:   trace,
+					})
+
 					continue
 				}
 

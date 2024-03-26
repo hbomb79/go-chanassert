@@ -6,25 +6,42 @@ import (
 	"strings"
 )
 
+type messageMode int
+
+const (
+	info messageMode = iota
+	debug
+)
+
 type TraceMessage struct {
 	Message string
 	Nested  []TraceMessage
+	Mode    messageMode
 }
 
-func newEmptyTrace(message string) TraceMessage {
-	return TraceMessage{Message: message}
+func newInfoTrace(message string, nested ...TraceMessage) TraceMessage {
+	return TraceMessage{Message: message, Nested: nested, Mode: info}
 }
 
-func newNestedTrace(message string, nested []TraceMessage) TraceMessage {
-	return TraceMessage{
-		Message: message,
-		Nested:  nested,
-	}
+func newDebugTrace(message string, nested ...TraceMessage) TraceMessage {
+	return TraceMessage{Message: message, Nested: nested, Mode: debug}
 }
+
+var levelPrefixes = []rune{'-', '*', '+', '>'}
 
 func (msg TraceMessage) printTrace(writer io.Writer, nestLevel int) {
-	fmt.Fprint(writer, strings.Repeat("  ", nestLevel))
-	fmt.Fprintf(writer, "- %s\n", msg.Message)
+	fmt.Fprint(writer, strings.Repeat("  ", nestLevel+1))
+
+	prefix := levelPrefixes[nestLevel%len(levelPrefixes)]
+
+	//exhaustive:enforce
+	switch msg.Mode {
+	case info:
+		fmt.Fprintf(writer, "%c %s\n", prefix, msg.Message)
+	case debug:
+		fmt.Fprintf(writer, "%c [DEBUG] %s\n", prefix, msg.Message)
+	}
+
 	for _, trace := range msg.Nested {
 		trace.printTrace(writer, nestLevel+1)
 	}
@@ -61,6 +78,6 @@ type messageResult[T any] struct {
 func (result messageResult[T]) prettyPrint(writer io.Writer) {
 	fmt.Fprintf(writer, "Message '%+v' - %s:\n", result.Message, result.Status)
 
-	result.Trace.printTrace(writer, 1)
+	result.Trace.printTrace(writer, 0)
 	fmt.Fprintln(writer, "")
 }

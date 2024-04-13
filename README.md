@@ -1,5 +1,6 @@
 # Chan Assert
 #### Asynchronous Channel Assertion Library
+[![Go Reference](https://pkg.go.dev/badge/github.com/hbomb79/go-chanassert.svg)](https://pkg.go.dev/github.com/hbomb79/go-chanassert)
 ![coverage](https://raw.githubusercontent.com/hbomb79/go-chanassert/badges/.badges/main/coverage.svg)
 
 Chan Assert is a declartive library designed to help you when writing tests which need to assert messages arriving through a channel. It's completely
@@ -77,7 +78,7 @@ Chanassert comes with many matchers, here's a few of the common ones:
 - `MatchPredicate`, matches messages using the predicate function,
 - `MatchStructPartial`, matches messages by comparing all _non-zero values_ in the provided struct and checking that the values match those found in the message,
 
-To see the full set of matchers, check out the Godoc, or the [matcher test suite](matcher_test.go). If a matcher which behaves how you need isn't available,
+To see the full set of matchers, check out the [documentation](https://pkg.go.dev/github.com/hbomb79/go-chanassert), or the [matcher test suite](matcher_test.go). If a matcher which behaves how you need isn't available,
 crafting your own custom matcher is trivially easy to do.
 
 ---

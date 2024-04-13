@@ -42,8 +42,9 @@ func (layer *layer[T]) TryMatch(message T) (bool, TraceMessage) {
 	traces := make([]TraceMessage, 0)
 	for idx, combiner := range layer.combiners {
 		ok, trace := combiner.TryMatch(message)
-		traces = append(traces, trace)
+		trace.Message = fmt.Sprintf("Combiner #%d: ", idx) + trace.Message
 
+		traces = append(traces, trace)
 		if ok {
 			return true, newInfoTrace(fmt.Sprintf("Layer #%d matched message against combiner #%d", layer.layerIdx, idx), traces...)
 		}

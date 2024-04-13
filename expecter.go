@@ -249,7 +249,12 @@ func (exp *expecter[T]) Listen() {
 			select {
 			case <-exp.closeChan:
 				return
-			case message := <-exp.channel:
+			case message, ok := <-exp.channel:
+				if !ok {
+					// channel closed
+					return
+				}
+
 				if ok, trace := exp.shouldIgnoreMessage(message); ok {
 					exp.results = append(exp.results, messageResult[T]{
 						Message: message,

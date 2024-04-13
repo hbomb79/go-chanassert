@@ -1,0 +1,54 @@
+EXPECTER: trace of processed messages follow:
+Message 'world' - ACCEPTED:
+  - Layer #0 matched message against combiner #0
+    * Combiner #0: Combiner matched on matcher #1
+      + Matcher #0 REJECT: no match
+      + Matcher #1 ACCEPT
+      + Combiner status
+        > EACH mode with minimum of 1 and maximum of 1
+        > NOT satisfied
+          - [DEBUG] EACH matcher needs to match at least 1 messages, but matchers [0 2 3] have yet to match any messages
+        > NOT saturated
+          - [DEBUG] EACH matcher needs to match at least 1 messages, but matchers [0 2 3] have yet to match any messages
+        > [DEBUG] Matcher counts
+          - Matcher #0 => 0 messages
+          - Matcher #1 => 1 message(s)
+          - Matcher #2 => 0 messages
+          - Matcher #3 => 0 messages
+
+Message 'hello' - ACCEPTED:
+  - Layer #0 matched message against combiner #0
+    * Combiner #0: Combiner matched on matcher #0
+      + Matcher #0 ACCEPT
+      + Combiner status
+        > EACH mode with minimum of 1 and maximum of 1
+        > NOT satisfied
+          - [DEBUG] EACH matcher needs to match at least 1 messages, but matchers [2 3] have yet to match any messages
+        > NOT saturated
+          - [DEBUG] EACH matcher needs to match at least 1 messages, but matchers [2 3] have yet to match any messages
+        > [DEBUG] Matcher counts
+          - Matcher #0 => 1 message(s)
+          - Matcher #1 => 1 message(s)
+          - Matcher #2 => 0 messages
+          - Matcher #3 => 0 messages
+
+Message 'ignore' - IGNORED:
+  - Ignore matcher #0 ACCEPTED
+
+Message 'foo' - ACCEPTED:
+  - Layer #0 matched message against combiner #0
+    * Combiner #0: Combiner matched on matcher #2
+      + Matcher #0 REJECT: no match
+      + Matcher #1 REJECT: no match
+      + Matcher #2 ACCEPT
+      + Combiner status
+        > EACH mode with minimum of 1 and maximum of 1
+        > NOT satisfied
+          - [DEBUG] EACH matcher needs to match at least 1 messages, but matchers [3] have yet to match any messages
+        > NOT saturated
+          - [DEBUG] EACH matcher needs to match at least 1 messages, but matchers [3] have yet to match any messages
+        > [DEBUG] Matcher counts
+          - Matcher #0 => 1 message(s)
+          - Matcher #1 => 1 message(s)
+          - Matcher #2 => 1 message(s)
+          - Matcher #3 => 0 messages

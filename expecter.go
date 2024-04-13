@@ -6,29 +6,34 @@ package chanassert
 import (
 	"errors"
 	"fmt"
+	"io"
+	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 )
 
-type ExpectCombiner[T any] interface {
-	DoesMatch(t T) bool
+var (
+	ErrUnsatisfiedExpecter    = errors.New("expecter did not become satisfied within timeout")
+	ErrRejectedMessage        = errors.New("expecter received message which was rejected")
+	ErrActiveLayerUnsatisfied = errors.New("active layer of expecter did not become satisfied")
+)
+
+type Combiner[T any] interface {
+	TryMatch(t T) (bool, TraceMessage)
 	IsSatisfied() bool
 }
 
-// ExpectLayer is the highest-level of matcher abstraction, and it defines
+// Layer is the highest-level of matcher abstraction, and it defines
 // a specific matcher which can be selected by the expecter at any one time. Each
 // time a new ExpectMatcher is provided to the Expecter, it is placed in it's own
 // layer. This is what gives the expecter the "expect this THEN this THEN this" pattern.
-type ExpectLayer[T any] interface {
-	// Begin is called when the layer is selected. This allows a layer to perform
-	// any logic which is best done when the previous layer has completed.
-	Begin()
-
-	// DoesMatch is called by the Expecter on a layer when a message is received. This method
+type Layer[T any] interface {
+	// TryMatch is called by the Expecter on a layer when a message is received. This method
 	// must return true if the message is valid for the layer, otherwise false. A 'Valid' message is
 	// determined by the specific layer implementation (e.g. timeoutLayer)
-	DoesMatch(t T) bool
+	TryMatch(message T) (bool, TraceMessage)
 
 	// IsSatisfied must return true if the layer does not intend to accept any more messages. Typically
 	// a layer will NOT return true if it's in an error condition, however this is implementation specific.
@@ -36,76 +41,115 @@ type ExpectLayer[T any] interface {
 	// the next layer in the expecter will be selected.
 	IsSatisfied() bool
 
-	// Errors must return the errors that this layer has witnessed during it's execution. These
-	// errors will be requested when checking if the expecter is satisfied, and the precence of errors
-	// indicates that a layer received messages it was not expecting.
-	Errors() []error
+	Begin()
 }
 
-type ExpecterErrors []error
+type Errors []error
 
-func (errs ExpecterErrors) String() string {
-	str := "ExpecterErrors {\n"
+func (errs Errors) String() string {
+	str := strings.Builder{}
+	str.WriteString("ExpecterErrors {\n")
 	for _, e := range errs {
-		str += fmt.Sprintf("  - %s\n", e)
+		str.WriteString("  - ")
+		str.WriteString(e.Error())
+		str.WriteString("\n")
 	}
-	str += "}\n"
+	str.WriteString("}\n")
 
-	return str
+	return str.String()
 }
 
 type Expecter[T any] interface {
+	ExpectAny(combiners ...Combiner[T]) Expecter[T]
+	Expect(combiners ...Combiner[T]) Expecter[T]
+	ExpectAnyTimeout(timeout time.Duration, combiners ...Combiner[T]) Expecter[T]
+	ExpectTimeout(timeout time.Duration, combiners ...Combiner[T]) Expecter[T]
+
 	Ignore(matchers ...Matcher[T]) Expecter[T]
-	Expect(layer ExpectCombiner[T]) Expecter[T]
-	ExpectTimeout(timeout time.Duration, layer ExpectCombiner[T]) Expecter[T]
+
 	AssertSatisfied(t *testing.T, timeout time.Duration)
-	Satisfied(timeout time.Duration) ExpecterErrors
+	AwaitSatisfied(timeout time.Duration) Errors
+
+	PrintTrace()
+	FPrintTrace(w io.Writer)
+	ProcessedMessages() []messageResult[T]
+
 	Listen()
 }
 
-type channelExpecter[T any] struct {
+type expecter[T any] struct {
 	channel        chan T
 	ignoreMatchers []Matcher[T]
 	currentLayer   int
-	expectLayers   []ExpectLayer[T]
+	expectLayers   []Layer[T]
 	wg             *sync.WaitGroup
 	closeChan      chan struct{}
+	results        []messageResult[T]
 }
 
-func NewChannelExpecter[T any](channel chan T) *channelExpecter[T] {
-	return &channelExpecter[T]{
+func NewChannelExpecter[T any](channel chan T) *expecter[T] {
+	return &expecter[T]{
 		channel:        channel,
 		currentLayer:   0,
 		ignoreMatchers: make([]Matcher[T], 0),
-		expectLayers:   make([]ExpectLayer[T], 0),
+		expectLayers:   make([]Layer[T], 0),
 		closeChan:      make(chan struct{}, 1),
 		wg:             &sync.WaitGroup{},
+		results:        make([]messageResult[T], 0),
 	}
 }
 
-func (exp *channelExpecter[T]) Ignore(matchers ...Matcher[T]) Expecter[T] {
+func (exp *expecter[T]) Ignore(matchers ...Matcher[T]) Expecter[T] {
 	exp.ignoreMatchers = append(exp.ignoreMatchers, matchers...)
 	return exp
 }
 
-func (exp *channelExpecter[T]) Expect(matcher ExpectCombiner[T]) Expecter[T] {
-	layer := &simpleLayer[T]{layerIdx: len(exp.expectLayers), combiner: matcher, errors: make([]error, 0)}
-	exp.expectLayers = append(exp.expectLayers, layer)
+func (exp *expecter[T]) addLayer(mode LayerMode, timeout *time.Duration, combiners []Combiner[T]) Expecter[T] {
+	layer := &layer[T]{
+		mode:      mode,
+		layerIdx:  len(exp.expectLayers),
+		combiners: combiners,
+		timeout:   timeout,
+	}
 
+	exp.expectLayers = append(exp.expectLayers, layer)
 	return exp
 }
 
-func (exp *channelExpecter[T]) ExpectTimeout(timeout time.Duration, matcher ExpectCombiner[T]) Expecter[T] {
-	layer := &timeoutLayer[T]{layerIdx: len(exp.expectLayers), timeout: timeout, combiner: matcher, errors: make([]error, 0)}
-	exp.expectLayers = append(exp.expectLayers, layer)
-
-	return exp
+func (exp *expecter[T]) ExpectAny(combiners ...Combiner[T]) Expecter[T] {
+	return exp.addLayer(or, nil, combiners)
 }
 
-func (exp *channelExpecter[T]) Satisfied(timeout time.Duration) ExpecterErrors {
+func (exp *expecter[T]) ExpectAnyTimeout(timeout time.Duration, combiners ...Combiner[T]) Expecter[T] {
+	return exp.addLayer(or, &timeout, combiners)
+}
+
+func (exp *expecter[T]) Expect(combiners ...Combiner[T]) Expecter[T] {
+	return exp.addLayer(and, nil, combiners)
+}
+
+func (exp *expecter[T]) ExpectTimeout(timeout time.Duration, combiners ...Combiner[T]) Expecter[T] {
+	return exp.addLayer(and, &timeout, combiners)
+}
+
+// AwaitSatisfied will wait (up to the timeout) for the expecter to see all layers
+// specified as being satisfied. If the expecter does not become satisfied in time,
+// it will be forcibly closed.
+//
+// The returns 'Errors' is a slice of all the errors found when looking through the
+// state of the expecter. The errors are:
+//   - UnsatisfiedExpecterErr, which indicates that the expecter did not 'finish' on
+//     it's own before the timeout provided to this function,
+//   - RejectedMessageErr, which indicates a message was received by the expecter
+//     but could not be matched against the active layer,
+//   - ActiveLayerUnsatisfiedErr, which indicates that the active layer at the time
+//     of the expecter finishing was not satisfied. In the absence of an
+//     UnsatisfiedExpecterErr, this indicates the message channel closed before the expecter
+//     witnessed enough messages to satisfy it's expectations.
+func (exp *expecter[T]) AwaitSatisfied(timeout time.Duration) Errors {
 	outErr := make([]error, 0)
 	reportErr := func(err error) {
-		outErr = append(outErr, fmt.Errorf("expecter error: %w", err))
+		outErr = append(outErr, err)
 	}
 
 	// Wait for the listen loop to close, up to timeout. Otherwise, close it manually
@@ -117,15 +161,15 @@ func (exp *channelExpecter[T]) Satisfied(timeout time.Duration) ExpecterErrors {
 
 	select {
 	case <-time.NewTimer(timeout).C:
-		reportErr(errors.New("expecter did not finish within timeout"))
+		reportErr(ErrUnsatisfiedExpecter)
 		exp.closeChan <- struct{}{}
 		<-finished
 	case <-finished:
 	}
 
-	for i, l := range exp.expectLayers {
-		for _, e := range l.Errors() {
-			reportErr(fmt.Errorf("layer #%d error: %w", i, e))
+	for idx, res := range exp.results {
+		if res.Status == rejected {
+			reportErr(fmt.Errorf("message #%d (%+v) REJECTED: %w", idx, res.Message, ErrRejectedMessage))
 		}
 	}
 
@@ -133,7 +177,7 @@ func (exp *channelExpecter[T]) Satisfied(timeout time.Duration) ExpecterErrors {
 		maybeLayer := exp.expectLayers[exp.currentLayer]
 		if maybeLayer != nil {
 			if !maybeLayer.IsSatisfied() {
-				reportErr(fmt.Errorf("layer #%d is not yet satisfied", exp.currentLayer))
+				reportErr(fmt.Errorf("layer #%d: %w", exp.currentLayer, ErrActiveLayerUnsatisfied))
 			}
 		}
 	}
@@ -141,31 +185,53 @@ func (exp *channelExpecter[T]) Satisfied(timeout time.Duration) ExpecterErrors {
 	return outErr
 }
 
-func (exp *channelExpecter[T]) AssertSatisfied(t *testing.T, timeout time.Duration) {
-	errors := exp.Satisfied(timeout)
+func (exp *expecter[T]) PrintTrace() {
+	exp.FPrintTrace(os.Stdout)
+}
 
+func (exp *expecter[T]) FPrintTrace(w io.Writer) {
+	fmt.Fprint(w, "EXPECTER: trace of processed messages follow:\n")
+	for _, msg := range exp.results {
+		msg.prettyPrint(w)
+	}
+}
+
+// ProcessedMessages returns a messageResult for each of the messages
+// processed by this expecter. Each messageResult contains the message itself,
+// along with it's status (i.e. whether accepted, rejected, or ignored) as well
+// as a trace which outlines the path the message took.
+func (exp *expecter[T]) ProcessedMessages() []messageResult[T] {
+	return exp.results
+}
+
+func (exp *expecter[T]) AssertSatisfied(t *testing.T, timeout time.Duration) {
+	errors := exp.AwaitSatisfied(timeout)
 	for _, e := range errors {
 		t.Errorf("expecter error: %s", e)
 	}
 
 	if len(errors) > 0 {
-		t.Fatalf("satisified assertion failed: expecter encountered errors (%d)", len(errors))
+		t.Errorf("satisified assertion failed: expecter encountered errors (%d)", len(errors))
+
+		stringBuilder := &strings.Builder{}
+		exp.FPrintTrace(stringBuilder)
+		t.Log(stringBuilder)
 	}
 }
 
-func (exp *channelExpecter[T]) Listen() {
-	if len(exp.expectLayers) == 0 {
-		panic("no layers specified")
+func (exp *expecter[T]) shouldIgnoreMessage(message T) (bool, TraceMessage) {
+	for idx, ignore := range exp.ignoreMatchers {
+		if ignore.DoesMatch(message) {
+			return true, newInfoTrace(fmt.Sprintf("Ignore matcher #%d ACCEPTED", idx))
+		}
 	}
 
-	shouldIgnore := func(message T) bool {
-		for _, ignore := range exp.ignoreMatchers {
-			if ignore.DoesMatch(message) {
-				return true
-			}
-		}
+	return false, newInfoTrace("")
+}
 
-		return false
+func (exp *expecter[T]) Listen() {
+	if len(exp.expectLayers) == 0 {
+		panic("no layers specified")
 	}
 
 	exp.wg.Add(1)
@@ -174,11 +240,9 @@ func (exp *channelExpecter[T]) Listen() {
 		exp.currentLayer = 0
 		for {
 			if exp.currentLayer >= len(exp.expectLayers) {
-				// No more layers.
 				return
 			}
 
-			// TODO: maybe be smarter and not call this every time
 			layer := exp.expectLayers[exp.currentLayer]
 			layer.Begin()
 
@@ -186,16 +250,31 @@ func (exp *channelExpecter[T]) Listen() {
 			case <-exp.closeChan:
 				return
 			case message := <-exp.channel:
-				if shouldIgnore(message) {
+				if ok, trace := exp.shouldIgnoreMessage(message); ok {
+					exp.results = append(exp.results, messageResult[T]{
+						Message: message,
+						Status:  ignored,
+						Trace:   trace,
+					})
+
 					continue
 				}
 
-				if layer.DoesMatch(message) {
-					if layer.IsSatisfied() {
-						// Layer accepted the message and is satisfied
-						exp.currentLayer++
-						continue
-					}
+				status := rejected
+				ok, trace := layer.TryMatch(message)
+				if ok {
+					status = accepted
+				}
+
+				exp.results = append(exp.results, messageResult[T]{
+					Message: message,
+					Status:  status,
+					Trace:   trace,
+				})
+
+				if status == accepted && layer.IsSatisfied() {
+					exp.currentLayer++
+					continue
 				}
 			}
 		}

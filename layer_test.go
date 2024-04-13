@@ -68,7 +68,7 @@ func Test_ExpectTimeout_AllOf_MatchStringContains_Overlapping(t *testing.T) {
 			if test.shouldSucceed {
 				exp.AssertSatisfied(t, time.Second)
 			} else {
-				errs := exp.Satisfied(time.Second)
+				errs := exp.AwaitSatisfied(time.Second)
 				if len(errs) > 0 {
 					t.Logf("satisified returns errors (as expected): %s", errs)
 				} else {
@@ -167,7 +167,7 @@ func Test_ExpectTimeout_AllOf_String(t *testing.T) {
 			if test.shouldSucceed {
 				exp.AssertSatisfied(t, time.Second)
 			} else {
-				errs := exp.Satisfied(time.Second)
+				errs := exp.AwaitSatisfied(time.Second)
 				if len(errs) > 0 {
 					t.Logf("satisified returns errors (as expected): %s", errs)
 				} else {
@@ -251,7 +251,7 @@ func Test_Expect_AllOf_String(t *testing.T) {
 			if test.shouldSucceed {
 				exp.AssertSatisfied(t, time.Second)
 			} else {
-				errs := exp.Satisfied(time.Second)
+				errs := exp.AwaitSatisfied(time.Second)
 				if len(errs) > 0 {
 					t.Logf("satisified returns errors (as expected): %s", errs)
 				} else {
@@ -343,7 +343,7 @@ func Test_ExpectTimeout_OneOf_String(t *testing.T) {
 			if test.shouldSucceed {
 				exp.AssertSatisfied(t, time.Second)
 			} else {
-				errs := exp.Satisfied(time.Second)
+				errs := exp.AwaitSatisfied(time.Second)
 				if len(errs) > 0 {
 					t.Logf("satisified returns errors (as expected): %s", errs)
 				} else {
@@ -422,7 +422,7 @@ func Test_Expect_OneOf_String(t *testing.T) {
 			if test.shouldSucceed {
 				exp.AssertSatisfied(t, time.Second)
 			} else {
-				errs := exp.Satisfied(time.Second)
+				errs := exp.AwaitSatisfied(time.Second)
 				if len(errs) > 0 {
 					t.Logf("satisified returns errors (as expected): %s", errs)
 				} else {
@@ -500,7 +500,7 @@ func Test_Expect_OneOf_Struct(t *testing.T) {
 			if test.shouldSucceed {
 				exp.AssertSatisfied(t, time.Second)
 			} else {
-				errs := exp.Satisfied(time.Second)
+				errs := exp.AwaitSatisfied(time.Second)
 				if len(errs) > 0 {
 					t.Logf("satisified returns errors (as expected): %s", errs)
 				} else {

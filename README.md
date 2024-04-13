@@ -16,7 +16,7 @@ If the expecter did not see the messages it expected to see (or saw messages it 
 If we wanted to setup an expecter which wants to see both `"hello"` and `"world"` strings pass through the expecter, you may declare your expecter like so
 
 ```golang
-func Test_XYZ(t *testing.T) {
+func Test_Xyz(t *testing.T) {
     expecter := chanassert.NewChannelExpecter(ch).
         Expect(chanassert.AllOf(
             chanassert.MatchEqual("hello"),
@@ -62,11 +62,74 @@ by the expecter once it's become satisfied.
 
 ---
 ##### Combiners
-Combiners provide a way to combine multiple matchers together using a number of flexible and powerful behaviours.
+Combiners provide a way to combine multiple matchers together using a number of flexible and powerful behaviours. Combiners take
+in some matchers (and some additional paramaters, depending on the combiner), and perform combination logic on your matchers.
 
-- `AllOf(matcher...)`, becomes satisfied when all of the matchers has matched against a message,
-- `OneOf(matcher...)`, becomes satisfied when any one of the matchers has matched against a message, 
-- `BetweenNOfAny(min, max, matcher...)`, becomes satisfied when the combiners have cumulatively matched between min and max messages.
+>[!TIP]
+> This is a non-exhaustive look at the high-level of combiners. The [Go Reference](https://pkg.go.dev/github.com/hbomb79/go-chanassert), [testing code](combiner_test.go), and [source code](combiner.go) are all excellent resources for understanding how each combiner behaves in detail.
+
+For example, say I expect to see `"hello"` come over the channel at least 5 times, but no more than 7 times, this is as simple
+as using the `BetweenNOf()` combiner like so:
+
+```golang
+chanassert.NewChannelExpecter(ch).Expect(
+    chanassert.BetweenNOf(5, 7, chanassert.MatchEqual("hello")),
+)
+```
+
+All combiners in chanassert fall in to one of three modes: `sum`, `each` and `any`. These modes dictate how a combiner becomes _satisfied_ and _saturated_.
+
+###### Satisfied and Saturated
+So far we've been talking a lot about when a combiner becomes 'satisfied', but combiners also track a concept called _saturation_.
+
+Essentially, if satisfied means the combiner has seen the minimum quantity of messages to satisfy it's requirements, then saturated is an indication of whether the combiner can match any _more_
+messages. This means satisfied is related to the `min` of a combiner, whereas saturated is all about it's `max`.
+
+Once saturated, the combiner will simply _reject_ all incoming messages. This means that combiners, once satisfied, _stay
+satisfied_ as they cannot exceed their maximum... If a combiner rejects a message due to being saturated, and no subsequent combiners can match it, then the message will be rejected and
+the expecter will fail (which is a good thing, as it indicates your channel did NOT meet the expectations you set).
+
+A combiners satisfaction and saturation state are recorded in the [expecter trace](#tracing) so that you can debug exactly why a message was rejected.
+
+###### Sum Combiners
+Sum combiners are perhaps the simplest type to understand, they become satisfied based on the **cumulative sum** of all matches it's seen.
+
+To identify a sum combiner, you can look at it's name. Any combiner that ends in `NOf` is a sum-type combiner.
+
+>[!TIP]
+> The `OneOf(matcher...)` combiner is actually shorthand for the `ExactlyNOf(1, matcher...)` combiner, so `OneOf` is _also_ a sum-type combiner.
+
+As an example of the 'sum' semantics, say I had a combiner like `BetweenNOf(5,7, MatchEqual("foo"), MatchEqual("bar"))`. This combiner
+would become satisfied after seeing any combination of 5 messages match against it's matchers. That is to say that all of these scenarios would make the combiner satisfied:
+- `"foo"`, `"bar"`, `"foo"`, `"bar"`, `"foo"`
+- `"foo"`, `"foo"`, `"foo"`, `"foo"`, `"foo"`
+- `"bar"`, `"bar"`, `"bar"`, `"bar"`, `"bar"`
+
+While 5 matches satisfies the combiner, two more messages (either `"foo"` or `"bar"`) could be sent before the combiner hits it's maximum number
+of matches (7 in this case) and stops accepting more messages (i.e. becomes saturated).
+
+###### Each Combiners
+Next up, _each_ type combiners. These allow you to set requirements for the number of message matches that must occur for _each_ of the matchers
+you provide. You can identify each-type combiners by looking at the name; any combiner which ends in `NOfEach` is an each-type combiner.
+
+>[!TIP]
+> The `AllOf(matcher...)` combiner is actually shorthand for `ExactlyNOfEach(1, matcher...)`, so `AllOf` is also an each-type combiner.
+
+As an example, let's say I have a combiner like `AtLeastNOfEach(2, MatchEqual("hello"), MatchEqual("world"))`, this combiner will only be satisfied
+once it's seen 2 or more matches for both `"hello"` _and_ `"world"`. The order that these messages arrive is not important.
+
+Each-type combiners also track saturation. Take this combiner for example: `BetweenNOfEach(1,2,MatchEqual("hello"), MatchEqual("world"))`, once
+a matcher has matched against it's maximum number of messages (2), it will not be allowed to match against any more.
+
+###### Any Combiners
+Finally, _any_ type combiners. If you think of each type combiners as being 'AND', then any type combiners are like an 'OR'. That is to say,
+the rules are basically the same, except that it becomes satisfied once _any_ of the matchers have matched against the minimum number
+of messages.
+
+Additionally, an any-type combiner will become saturated once _any_ of the matchers have matched against their maximum number of messages.
+
+You can identify any-type combiners by looking at the name (I hope by now you can see the pattern). If a combiner ends in `NOfAny`, then you've got
+yourself an any-type combiner.
 
 ---
 ##### Matchers

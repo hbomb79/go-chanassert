@@ -192,7 +192,7 @@ func (exp *expecter[T]) PrintTrace() {
 func (exp *expecter[T]) FPrintTrace(w io.Writer) {
 	fmt.Fprint(w, "EXPECTER: trace of processed messages follow:\n")
 	for _, msg := range exp.results {
-		msg.prettyPrint(w)
+		msg.PrettyPrint(w)
 	}
 }
 

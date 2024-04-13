@@ -72,6 +72,7 @@ type Expecter[T any] interface {
 
 	PrintTrace()
 	FPrintTrace(w io.Writer)
+	ProcessedMessages() []messageResult[T]
 
 	Listen()
 }

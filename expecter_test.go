@@ -2,6 +2,7 @@ package chanassert_test
 
 import (
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -13,6 +14,21 @@ type delayMessage[T any] struct {
 	message T
 }
 
+type expectedErrors []error
+
+func (exp expectedErrors) String() string {
+	str := strings.Builder{}
+	str.WriteString("[\n")
+	for _, e := range exp {
+		str.WriteString("  \"")
+		str.WriteString(e.Error())
+		str.WriteString("\",\n")
+	}
+	str.WriteString("]\n")
+
+	return str.String()
+}
+
 type expecterTest[T any] struct {
 	Summary       string
 	Messages      []T
@@ -21,10 +37,10 @@ type expecterTest[T any] struct {
 	// ExpectedErrors contains the wrapped errors we expect the expecter to return. These
 	// errors can cover all possibilities, such as unexpected messages, timeout cancellation,
 	// and unsatisfied layers. An empty slice will enforce that there were no errors returned.
-	ExpectedErrors []error
+	ExpectedErrors expectedErrors
 }
 
-func assertErrorsExpected(t *testing.T, errs chanassert.Errors, expected []error) {
+func assertErrorsExpected(t *testing.T, errs chanassert.Errors, expected expectedErrors) {
 	if len(errs) == 0 && len(expected) == 0 {
 		return
 	}
@@ -34,18 +50,30 @@ func assertErrorsExpected(t *testing.T, errs chanassert.Errors, expected []error
 		return
 	}
 
+	// Check that all errors returned are EXPECTED, fail if
+	// any errors are not, or if any expected errors were not seen.
+	outstanding := make(map[error]struct{})
+	for _, e := range expected {
+		outstanding[e] = struct{}{}
+	}
+
 	for _, err := range errs {
 		found := false
 		for _, expErr := range expected {
 			if errors.Is(err, expErr) {
+				delete(outstanding, expErr)
 				found = true
 				break
 			}
 		}
 
 		if !found {
-			t.Errorf("error '%s' returned by expecter, but was NOT expected", err)
+			t.Errorf("error '%s' returned, but NOT expected", err)
 		}
+	}
+
+	if len(outstanding) != 0 {
+		t.Errorf("expected errors not satisfied:\n=> Errors returned:\n---\n%s\n=> Expected:\n---\n%s\n=> Did not see:\n---\n%s\n\n", errs, expected, outstanding)
 	}
 }
 
@@ -249,8 +277,8 @@ func Test_Expect_MultipleCombiner(t *testing.T) {
 		},
 		{
 			Summary:        "One combiner satisfied",
-			Messages:       []string{"second"},
-			ExpectedErrors: []error{chanassert.ErrRejectedMessage, chanassert.ErrUnsatisfiedExpecter, chanassert.ErrActiveLayerUnsatisfied},
+			Messages:       []string{"world", "second", "hello"},
+			ExpectedErrors: []error{chanassert.ErrUnsatisfiedExpecter, chanassert.ErrActiveLayerUnsatisfied},
 		},
 	}
 

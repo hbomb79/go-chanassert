@@ -91,6 +91,16 @@ func runExpecterTests[T any](t *testing.T, makeExpecter func() (chan T, chanasse
 			ch, expecter := makeExpecter()
 			expecter.Listen()
 
+			defer func() {
+				if !t.Failed() {
+					return
+				}
+
+				builder := strings.Builder{}
+				expecter.FPrintTrace(&builder)
+				t.Logf("test failed, expecter trace:\n%s", builder.String())
+			}()
+
 			if test.Messages != nil {
 				for _, m := range test.Messages {
 					ch <- m

@@ -271,3 +271,157 @@ func Test_Trace_SingleLayer_MultipleCombiner(t *testing.T) {
 
 	runTraceTests(t, makeExpecter, tests)
 }
+
+//nolint:funlen
+func Test_Trace_MultipleLayer_MultipleCombiner(t *testing.T) {
+	makeExpecter := func() (chan string, chanassert.Expecter[string]) {
+		c := make(chan string, 10)
+		return c, chanassert.
+			NewChannelExpecter(c).
+			Ignore(chanassert.MatchEqual("ignore")).
+			Expect(
+				chanassert.AllOf(
+					chanassert.MatchEqual("hello"),
+					chanassert.MatchEqual("world"),
+				),
+				chanassert.ExactlyNOfAny(2,
+					chanassert.MatchEqual("foo"),
+					chanassert.MatchEqual("bar"),
+				),
+			).
+			ExpectAny(
+				chanassert.OneOf(
+					chanassert.MatchEqual("a"),
+					chanassert.MatchEqual("b"),
+					chanassert.MatchEqual("c"),
+				),
+				chanassert.OneOf(
+					chanassert.MatchEqual("x"),
+					chanassert.MatchEqual("y"),
+					chanassert.MatchEqual("z"),
+				),
+			)
+	}
+
+	tests := []traceTest{
+		{
+			Summary: "Messages delivered in order (A)",
+			Messages: []message{
+				// Layer 0
+				{"hello", chanassert.Accepted},
+				{"world", chanassert.Accepted},
+				{"foo", chanassert.Accepted},
+				{"bar", chanassert.Accepted},
+				{"foo", chanassert.Accepted},
+				// Layer 1
+				{"a", chanassert.Accepted},
+			},
+			ShouldComplete: true,
+		},
+		{
+			Summary: "Messages delivered in order (Z)",
+			Messages: []message{
+				// Layer 0
+				{"hello", chanassert.Accepted},
+				{"world", chanassert.Accepted},
+				{"foo", chanassert.Accepted},
+				{"bar", chanassert.Accepted},
+				{"foo", chanassert.Accepted},
+				// Layer 1
+				{"z", chanassert.Accepted},
+			},
+			ShouldComplete: true,
+		},
+		{
+			Summary: "Messages delivered out of order",
+			Messages: []message{
+				// Layer 0
+				{"bar", chanassert.Accepted},
+				{"foo", chanassert.Accepted},
+				{"hello", chanassert.Accepted},
+				{"foo", chanassert.Accepted},
+				{"world", chanassert.Accepted},
+				// Layer 1
+				{"b", chanassert.Accepted},
+			},
+			ShouldComplete: true,
+		},
+		{
+			Summary: "Messages delivered with rejections",
+			Messages: []message{
+				// Layer 0
+				{"hello", chanassert.Accepted},
+				{"world", chanassert.Accepted},
+				{"reject", chanassert.Rejected},
+				{"foo", chanassert.Accepted},
+				{"bar", chanassert.Accepted},
+				{"reject", chanassert.Rejected},
+				{"foo", chanassert.Accepted},
+				// Layer 1
+				{"d", chanassert.Rejected},
+				{"y", chanassert.Accepted},
+			},
+			ShouldComplete: false,
+		},
+		{
+			Summary: "Messages for first combiner of first layer",
+			Messages: []message{
+				{"world", chanassert.Accepted},
+				{"hello", chanassert.Accepted},
+				{"ignore", chanassert.Ignored},
+			},
+			ShouldComplete: false,
+		},
+		{
+			Summary: "Messages for first combiner of second layer",
+			Messages: []message{
+				// Layer 0
+				{"hello", chanassert.Accepted},
+				{"world", chanassert.Accepted},
+				{"foo", chanassert.Accepted},
+				{"bar", chanassert.Accepted},
+				{"foo", chanassert.Accepted},
+				// Layer 1
+				{"c", chanassert.Accepted},
+			},
+			ShouldComplete: true,
+		},
+		{
+			Summary: "Messages for second combiner of second layer",
+			Messages: []message{
+				// Layer 0
+				{"hello", chanassert.Accepted},
+				{"world", chanassert.Accepted},
+				{"foo", chanassert.Accepted},
+				{"bar", chanassert.Accepted},
+				{"foo", chanassert.Accepted},
+				// Layer 1
+				{"x", chanassert.Accepted},
+			},
+			ShouldComplete: true,
+		},
+		{
+			Summary: "Too many messages for first combiner",
+			Messages: []message{
+				{"hello", chanassert.Accepted},
+				{"world", chanassert.Accepted},
+				{"ignore", chanassert.Ignored},
+				{"hello", chanassert.Rejected},
+				{"world", chanassert.Rejected},
+			},
+			ShouldComplete: false,
+		},
+		{
+			Summary: "Messages for first layer, second combiner",
+			Messages: []message{
+				{"foo", chanassert.Accepted},
+				{"bar", chanassert.Accepted},
+				{"ignore", chanassert.Ignored},
+				{"bar", chanassert.Accepted},
+			},
+			ShouldComplete: false,
+		},
+	}
+
+	runTraceTests(t, makeExpecter, tests)
+}

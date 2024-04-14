@@ -34,11 +34,8 @@ Message 'world' - ACCEPTED:
       + "AND" mode
       + NOT satisfied: only combiners [#0] satisfied, [#1] NOT yet satisfied
 
-Message 'ignore' - IGNORED:
-  - Ignore matcher #0 ACCEPTED
-
-Message 'hello' - REJECTED:
-  - Layer #0 could not match message against any combiners
+Message 'foo' - ACCEPTED:
+  - Layer #0 matched message against combiner #1
     * Combiner #0: Combiner is fully saturated, accepting no further messages
       + Combiner status
         > EACH mode with minimum of 1 and maximum of 1
@@ -49,9 +46,8 @@ Message 'hello' - REJECTED:
         > [DEBUG] Matcher counts
           - Matcher #0 => 1 message(s)
           - Matcher #1 => 1 message(s)
-    * Combiner #1: Combiner failed match message
-      + Matcher #0 REJECT: no match
-      + Matcher #1 REJECT: no match
+    * Combiner #1: Combiner matched on matcher #0
+      + Matcher #0 ACCEPT
       + Combiner status
         > ANY mode with minimum of 2 and maximum of 2
         > NOT satisfied
@@ -59,14 +55,14 @@ Message 'hello' - REJECTED:
         > NOT saturated
           - [DEBUG] ANY matcher needs to match 2 messages, but none have
         > [DEBUG] Matcher counts
-          - Matcher #0 => 0 messages
+          - Matcher #0 => 1 message(s)
           - Matcher #1 => 0 messages
     * [DEBUG] Layer Status
       + "AND" mode
       + NOT satisfied: only combiners [#0] satisfied, [#1] NOT yet satisfied
 
-Message 'world' - REJECTED:
-  - Layer #0 could not match message against any combiners
+Message 'bar' - ACCEPTED:
+  - Layer #0 matched message against combiner #1
     * Combiner #0: Combiner is fully saturated, accepting no further messages
       + Combiner status
         > EACH mode with minimum of 1 and maximum of 1
@@ -77,9 +73,9 @@ Message 'world' - REJECTED:
         > [DEBUG] Matcher counts
           - Matcher #0 => 1 message(s)
           - Matcher #1 => 1 message(s)
-    * Combiner #1: Combiner failed match message
+    * Combiner #1: Combiner matched on matcher #1
       + Matcher #0 REJECT: no match
-      + Matcher #1 REJECT: no match
+      + Matcher #1 ACCEPT
       + Combiner status
         > ANY mode with minimum of 2 and maximum of 2
         > NOT satisfied
@@ -87,9 +83,68 @@ Message 'world' - REJECTED:
         > NOT saturated
           - [DEBUG] ANY matcher needs to match 2 messages, but none have
         > [DEBUG] Matcher counts
-          - Matcher #0 => 0 messages
-          - Matcher #1 => 0 messages
+          - Matcher #0 => 1 message(s)
+          - Matcher #1 => 1 message(s)
     * [DEBUG] Layer Status
       + "AND" mode
       + NOT satisfied: only combiners [#0] satisfied, [#1] NOT yet satisfied
+
+Message 'foo' - ACCEPTED:
+  - Layer #0 matched message against combiner #1
+    * Combiner #0: Combiner is fully saturated, accepting no further messages
+      + Combiner status
+        > EACH mode with minimum of 1 and maximum of 1
+        > Satisfied
+          - [DEBUG] EACH matcher has matched at least 1 messages
+        > Saturated
+          - [DEBUG] EACH matcher has matched maximum allowed messages (1)
+        > [DEBUG] Matcher counts
+          - Matcher #0 => 1 message(s)
+          - Matcher #1 => 1 message(s)
+    * Combiner #1: Combiner matched on matcher #0
+      + Matcher #0 ACCEPT
+      + Combiner status
+        > ANY mode with minimum of 2 and maximum of 2
+        > Satisfied
+          - [DEBUG] Matcher #0 has matched against minimum messages (2)
+        > Saturated
+          - [DEBUG] Matcher #0 has matched against maximum messages (2)
+        > [DEBUG] Matcher counts
+          - Matcher #0 => 2 message(s)
+          - Matcher #1 => 1 message(s)
+    * [DEBUG] Layer Status
+      + "AND" mode
+      + SATISFIED: all combiners satisfied (2)
+
+Message 'x' - ACCEPTED:
+  - Layer #1 matched message against combiner #1
+    * Combiner #0: Combiner failed match message
+      + Matcher #0 REJECT: no match
+      + Matcher #1 REJECT: no match
+      + Matcher #2 REJECT: no match
+      + Combiner status
+        > SUM mode with minimum of 1 and maximum of 1
+        > NOT satisfied
+          - [DEBUG] SUM of all matched messages (0) must meet 1 messages
+        > NOT saturated
+          - [DEBUG] SUM of all matched messages (0) must be at least 1
+        > [DEBUG] Matcher counts
+          - Matcher #0 => 0 messages
+          - Matcher #1 => 0 messages
+          - Matcher #2 => 0 messages
+    * Combiner #1: Combiner matched on matcher #0
+      + Matcher #0 ACCEPT
+      + Combiner status
+        > SUM mode with minimum of 1 and maximum of 1
+        > Satisfied
+          - [DEBUG] SUM of all matched messages (1) has met minimum (1) messages
+        > Saturated
+          - [DEBUG] SUM of all matched messages (1) has met maximum (1) messages
+        > [DEBUG] Matcher counts
+          - Matcher #0 => 1 message(s)
+          - Matcher #1 => 0 messages
+          - Matcher #2 => 0 messages
+    * [DEBUG] Layer Status
+      + "OR" mode
+      + SATISFIED: combiners [#1] satisfied (and [#0] NOT satisfied, but 'OR' mode only needs ONE combiner to be satisfied)
 

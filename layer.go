@@ -13,6 +13,10 @@ const (
 	or
 )
 
+func (mode LayerMode) String() string {
+	return []string{"AND", "OR"}[mode]
+}
+
 type layer[T any] struct {
 	combiners []Combiner[T]
 	satisfied bool
@@ -35,7 +39,7 @@ func (layer *layer[T]) Begin() {
 
 func (layer *layer[T]) TryMatch(message T) (bool, TraceMessage) {
 	ok, trace := layer.tryMatch(message)
-	trace.Nested = append(trace.Nested, layer.getCombinerStatusTrace())
+	trace.Nested = append(trace.Nested, layer.makeLayerStatusTrace())
 
 	return ok, trace
 }
@@ -97,10 +101,16 @@ func (layer *layer[T]) timeoutElapsed() bool {
 	return layer.timeout != nil && time.Until(layer.startTime.Add(*layer.timeout)) <= 0
 }
 
-func (layer *layer[T]) getCombinerStatusTrace() TraceMessage {
+func (layer *layer[T]) makeLayerStatusTrace() TraceMessage {
+	return newDebugTrace("Layer Status",
+		newInfoTrace(fmt.Sprintf("%q mode", layer.mode)),
+		layer.makeCombinersTrace(),
+	)
+}
+
+func (layer *layer[T]) makeCombinersTrace() TraceMessage {
 	notSatisfied := make(idxList, 0)
 	satisfied := make(idxList, 0)
-
 	for idx, combiner := range layer.combiners {
 		if combiner.IsSatisfied() {
 			satisfied = append(satisfied, idx)
@@ -109,25 +119,29 @@ func (layer *layer[T]) getCombinerStatusTrace() TraceMessage {
 		}
 	}
 
-	if len(notSatisfied) == len(layer.combiners) {
-		return newDebugTrace(
-			fmt.Sprintf("No combiners satisfied (0 of %d)", len(layer.combiners)),
-		)
-	} else if len(satisfied) == len(layer.combiners) {
-		return newDebugTrace(
-			fmt.Sprintf("ALL combiners satisfied (%d)", len(layer.combiners)),
-		)
+	if layer.mode == and {
+		switch {
+		case len(notSatisfied) == len(layer.combiners):
+			return newInfoTrace(fmt.Sprintf("NOT satisfied: no combiners satisfied (of %d)", len(layer.combiners)))
+		case len(satisfied) == len(layer.combiners):
+			return newInfoTrace(fmt.Sprintf("SATISFIED: all combiners satisfied (%d)", len(layer.combiners)))
+		default:
+			return newInfoTrace(fmt.Sprintf("NOT satisfied: only combiners %s satisfied, %s NOT yet satisfied", satisfied, notSatisfied))
+		}
 	} else {
-		return newDebugTrace(
-			fmt.Sprintf("Combiners %s satisfied, %s NOT satisfied", satisfied, notSatisfied),
-		)
+		switch {
+		case len(satisfied) == 0:
+			return newInfoTrace(fmt.Sprintf("NOT satisfied: no combiners satisfied (of %d)", len(layer.combiners)))
+		default:
+			return newInfoTrace(fmt.Sprintf("SATISFIED: combiners %s satisfied (and %s NOT satisfied, but 'OR' mode only needs ONE combiner to be satisfied)", satisfied, notSatisfied))
+		}
 	}
 }
 
 // idxList is a simple wrapper around a list of ints which
 // represent indexes. The main benefit is that we customize
 // how this list is converted to a string such that it looks
-// like [#0, #1, #2] rather than [0 1 2]
+// like [#0, #1, #2] rather than [0 1 2].
 type idxList []int
 
 func (list idxList) String() string {

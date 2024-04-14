@@ -122,3 +122,22 @@ Message 'world' - ACCEPTED:
       + "AND" mode
       + SATISFIED: all combiners satisfied (2)
 
+Message 'b' - ACCEPTED:
+  - Layer #1 matched message against combiner #0
+    * Combiner #0: Combiner matched on matcher #1
+      + Matcher #0 REJECT: no match
+      + Matcher #1 ACCEPT
+      + Combiner status
+        > SUM mode with minimum of 1 and maximum of 1
+        > Satisfied
+          - [DEBUG] SUM of all matched messages (1) has met minimum (1) messages
+        > Saturated
+          - [DEBUG] SUM of all matched messages (1) has met maximum (1) messages
+        > [DEBUG] Matcher counts
+          - Matcher #0 => 0 messages
+          - Matcher #1 => 1 message(s)
+          - Matcher #2 => 0 messages
+    * [DEBUG] Layer Status
+      + "OR" mode
+      + SATISFIED: combiners [#0] satisfied (and [#1] NOT satisfied, but 'OR' mode only needs ONE combiner to be satisfied)
+

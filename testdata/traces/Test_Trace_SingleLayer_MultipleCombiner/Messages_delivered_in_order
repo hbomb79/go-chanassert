@@ -12,7 +12,9 @@ Message 'hello' - ACCEPTED:
         > [DEBUG] Matcher counts
           - Matcher #0 => 1 message(s)
           - Matcher #1 => 0 messages
-    * [DEBUG] No combiners satisfied (0 of 2)
+    * [DEBUG] Layer Status
+      + "AND" mode
+      + NOT satisfied: no combiners satisfied (of 2)
 
 Message 'world' - ACCEPTED:
   - Layer #0 matched message against combiner #0
@@ -28,7 +30,9 @@ Message 'world' - ACCEPTED:
         > [DEBUG] Matcher counts
           - Matcher #0 => 1 message(s)
           - Matcher #1 => 1 message(s)
-    * [DEBUG] Combiners [#0] satisfied, [#1] NOT satisfied
+    * [DEBUG] Layer Status
+      + "AND" mode
+      + NOT satisfied: only combiners [#0] satisfied, [#1] NOT yet satisfied
 
 Message 'foo' - ACCEPTED:
   - Layer #0 matched message against combiner #1
@@ -53,7 +57,9 @@ Message 'foo' - ACCEPTED:
         > [DEBUG] Matcher counts
           - Matcher #0 => 1 message(s)
           - Matcher #1 => 0 messages
-    * [DEBUG] Combiners [#0] satisfied, [#1] NOT satisfied
+    * [DEBUG] Layer Status
+      + "AND" mode
+      + NOT satisfied: only combiners [#0] satisfied, [#1] NOT yet satisfied
 
 Message 'bar' - ACCEPTED:
   - Layer #0 matched message against combiner #1
@@ -79,7 +85,9 @@ Message 'bar' - ACCEPTED:
         > [DEBUG] Matcher counts
           - Matcher #0 => 1 message(s)
           - Matcher #1 => 1 message(s)
-    * [DEBUG] Combiners [#0] satisfied, [#1] NOT satisfied
+    * [DEBUG] Layer Status
+      + "AND" mode
+      + NOT satisfied: only combiners [#0] satisfied, [#1] NOT yet satisfied
 
 Message 'foo' - ACCEPTED:
   - Layer #0 matched message against combiner #1
@@ -104,5 +112,7 @@ Message 'foo' - ACCEPTED:
         > [DEBUG] Matcher counts
           - Matcher #0 => 2 message(s)
           - Matcher #1 => 1 message(s)
-    * [DEBUG] ALL combiners satisfied (2)
+    * [DEBUG] Layer Status
+      + "AND" mode
+      + SATISFIED: all combiners satisfied (2)
 

@@ -15,7 +15,9 @@ Message 'world' - ACCEPTED:
           - Matcher #1 => 1 message(s)
           - Matcher #2 => 0 messages
           - Matcher #3 => 0 messages
-    * [DEBUG] No combiners satisfied (0 of 1)
+    * [DEBUG] Layer Status
+      + "AND" mode
+      + NOT satisfied: no combiners satisfied (of 1)
 
 Message 'hello' - ACCEPTED:
   - Layer #0 matched message against combiner #0
@@ -32,7 +34,9 @@ Message 'hello' - ACCEPTED:
           - Matcher #1 => 1 message(s)
           - Matcher #2 => 0 messages
           - Matcher #3 => 0 messages
-    * [DEBUG] No combiners satisfied (0 of 1)
+    * [DEBUG] Layer Status
+      + "AND" mode
+      + NOT satisfied: no combiners satisfied (of 1)
 
 Message 'ignore' - IGNORED:
   - Ignore matcher #0 ACCEPTED
@@ -54,5 +58,7 @@ Message 'foo' - ACCEPTED:
           - Matcher #1 => 1 message(s)
           - Matcher #2 => 1 message(s)
           - Matcher #3 => 0 messages
-    * [DEBUG] No combiners satisfied (0 of 1)
+    * [DEBUG] Layer Status
+      + "AND" mode
+      + NOT satisfied: no combiners satisfied (of 1)
 

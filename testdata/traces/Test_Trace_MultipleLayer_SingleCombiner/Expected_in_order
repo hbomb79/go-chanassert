@@ -6,14 +6,15 @@ Message 'hello' - ACCEPTED:
       + Combiner status
         > EACH mode with minimum of 1 and maximum of 1
         > NOT satisfied
-          - [DEBUG] EACH matcher needs to match at least 1 messages, but matchers [1 2 3] have yet to match any messages
+          - [DEBUG] EACH matcher needs to match at least 1 messages, but matchers [#1, #2, #3] have yet to match any messages
         > NOT saturated
-          - [DEBUG] EACH matcher needs to match at least 1 messages, but matchers [1 2 3] have yet to match any messages
+          - [DEBUG] EACH matcher needs to match at least 1 messages, but matchers [#1, #2, #3] have yet to match any messages
         > [DEBUG] Matcher counts
           - Matcher #0 => 1 message(s)
           - Matcher #1 => 0 messages
           - Matcher #2 => 0 messages
           - Matcher #3 => 0 messages
+    * [DEBUG] No combiners satisfied (0 of 1)
 
 Message 'world' - ACCEPTED:
   - Layer #0 matched message against combiner #0
@@ -23,14 +24,15 @@ Message 'world' - ACCEPTED:
       + Combiner status
         > EACH mode with minimum of 1 and maximum of 1
         > NOT satisfied
-          - [DEBUG] EACH matcher needs to match at least 1 messages, but matchers [2 3] have yet to match any messages
+          - [DEBUG] EACH matcher needs to match at least 1 messages, but matchers [#2, #3] have yet to match any messages
         > NOT saturated
-          - [DEBUG] EACH matcher needs to match at least 1 messages, but matchers [2 3] have yet to match any messages
+          - [DEBUG] EACH matcher needs to match at least 1 messages, but matchers [#2, #3] have yet to match any messages
         > [DEBUG] Matcher counts
           - Matcher #0 => 1 message(s)
           - Matcher #1 => 1 message(s)
           - Matcher #2 => 0 messages
           - Matcher #3 => 0 messages
+    * [DEBUG] No combiners satisfied (0 of 1)
 
 Message 'foo' - ACCEPTED:
   - Layer #0 matched message against combiner #0
@@ -41,14 +43,15 @@ Message 'foo' - ACCEPTED:
       + Combiner status
         > EACH mode with minimum of 1 and maximum of 1
         > NOT satisfied
-          - [DEBUG] EACH matcher needs to match at least 1 messages, but matchers [3] have yet to match any messages
+          - [DEBUG] EACH matcher needs to match at least 1 messages, but matchers [#3] have yet to match any messages
         > NOT saturated
-          - [DEBUG] EACH matcher needs to match at least 1 messages, but matchers [3] have yet to match any messages
+          - [DEBUG] EACH matcher needs to match at least 1 messages, but matchers [#3] have yet to match any messages
         > [DEBUG] Matcher counts
           - Matcher #0 => 1 message(s)
           - Matcher #1 => 1 message(s)
           - Matcher #2 => 1 message(s)
           - Matcher #3 => 0 messages
+    * [DEBUG] No combiners satisfied (0 of 1)
 
 Message 'bar' - ACCEPTED:
   - Layer #0 matched message against combiner #0
@@ -62,12 +65,13 @@ Message 'bar' - ACCEPTED:
         > Satisfied
           - [DEBUG] EACH matcher has matched at least 1 messages
         > Saturated
-          - [DEBUG] All matchers have matched maximum allowed messages (1)
+          - [DEBUG] EACH matcher has matched maximum allowed messages (1)
         > [DEBUG] Matcher counts
           - Matcher #0 => 1 message(s)
           - Matcher #1 => 1 message(s)
           - Matcher #2 => 1 message(s)
           - Matcher #3 => 1 message(s)
+    * [DEBUG] ALL combiners satisfied (1)
 
 Message 'hello' - ACCEPTED:
   - Layer #1 matched message against combiner #0
@@ -78,10 +82,11 @@ Message 'hello' - ACCEPTED:
         > NOT satisfied
           - [DEBUG] ANY matcher needs to match at least 2 messages, but none have
         > NOT saturated
-          - [DEBUG] ANY matcher needs to match at least 2 messages, but none have
+          - [DEBUG] ANY matcher needs to match 2 messages, but none have
         > [DEBUG] Matcher counts
           - Matcher #0 => 1 message(s)
           - Matcher #1 => 0 messages
+    * [DEBUG] No combiners satisfied (0 of 1)
 
 Message 'world' - ACCEPTED:
   - Layer #1 matched message against combiner #0
@@ -93,10 +98,11 @@ Message 'world' - ACCEPTED:
         > NOT satisfied
           - [DEBUG] ANY matcher needs to match at least 2 messages, but none have
         > NOT saturated
-          - [DEBUG] ANY matcher needs to match at least 2 messages, but none have
+          - [DEBUG] ANY matcher needs to match 2 messages, but none have
         > [DEBUG] Matcher counts
           - Matcher #0 => 1 message(s)
           - Matcher #1 => 1 message(s)
+    * [DEBUG] No combiners satisfied (0 of 1)
 
 Message 'world' - ACCEPTED:
   - Layer #1 matched message against combiner #0
@@ -108,7 +114,9 @@ Message 'world' - ACCEPTED:
         > Satisfied
           - [DEBUG] Matcher #1 has matched against minimum messages (2)
         > Saturated
-          - [DEBUG] Matcher #2 has matched against maximum messages
+          - [DEBUG] Matcher #1 has matched against maximum messages (2)
         > [DEBUG] Matcher counts
           - Matcher #0 => 1 message(s)
           - Matcher #1 => 2 message(s)
+    * [DEBUG] ALL combiners satisfied (1)
+

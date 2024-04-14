@@ -1,0 +1,35 @@
+EXPECTER: trace of processed messages follow:
+Message 'world' - ACCEPTED:
+  - Layer #0 matched message against combiner #0
+    * Combiner #0: Combiner matched on matcher #1
+      + Matcher #0 REJECT: no match
+      + Matcher #1 ACCEPT
+      + Combiner status
+        > EACH mode with minimum of 1 and maximum of 1
+        > NOT satisfied
+          - [DEBUG] EACH matcher needs to match at least 1 messages, but matchers [#0] have yet to match any messages
+        > NOT saturated
+          - [DEBUG] EACH matcher needs to match at least 1 messages, but matchers [#0] have yet to match any messages
+        > [DEBUG] Matcher counts
+          - Matcher #0 => 0 messages
+          - Matcher #1 => 1 message(s)
+    * [DEBUG] No combiners satisfied (0 of 2)
+
+Message 'hello' - ACCEPTED:
+  - Layer #0 matched message against combiner #0
+    * Combiner #0: Combiner matched on matcher #0
+      + Matcher #0 ACCEPT
+      + Combiner status
+        > EACH mode with minimum of 1 and maximum of 1
+        > Satisfied
+          - [DEBUG] EACH matcher has matched at least 1 messages
+        > Saturated
+          - [DEBUG] EACH matcher has matched maximum allowed messages (1)
+        > [DEBUG] Matcher counts
+          - Matcher #0 => 1 message(s)
+          - Matcher #1 => 1 message(s)
+    * [DEBUG] Combiners [#0] satisfied, [#1] NOT satisfied
+
+Message 'ignore' - IGNORED:
+  - Ignore matcher #0 ACCEPTED
+

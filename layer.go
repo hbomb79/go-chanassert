@@ -2,6 +2,7 @@ package chanassert
 
 import (
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -33,6 +34,13 @@ func (layer *layer[T]) Begin() {
 }
 
 func (layer *layer[T]) TryMatch(message T) (bool, TraceMessage) {
+	ok, trace := layer.tryMatch(message)
+	trace.Nested = append(trace.Nested, layer.getCombinerStatusTrace())
+
+	return ok, trace
+}
+
+func (layer *layer[T]) tryMatch(message T) (bool, TraceMessage) {
 	if layer.timeoutElapsed() {
 		return false, newInfoTrace(fmt.Sprintf("Message %v (%T) REJECTED, timeout of layer (%s) has been reached", message, message, layer.timeout))
 	}
@@ -87,4 +95,53 @@ func (layer *layer[T]) updateSatisfied() {
 
 func (layer *layer[T]) timeoutElapsed() bool {
 	return layer.timeout != nil && time.Until(layer.startTime.Add(*layer.timeout)) <= 0
+}
+
+func (layer *layer[T]) getCombinerStatusTrace() TraceMessage {
+	notSatisfied := make(idxList, 0)
+	satisfied := make(idxList, 0)
+
+	for idx, combiner := range layer.combiners {
+		if combiner.IsSatisfied() {
+			satisfied = append(satisfied, idx)
+		} else {
+			notSatisfied = append(notSatisfied, idx)
+		}
+	}
+
+	if len(notSatisfied) == len(layer.combiners) {
+		return newDebugTrace(
+			fmt.Sprintf("No combiners satisfied (0 of %d)", len(layer.combiners)),
+		)
+	} else if len(satisfied) == len(layer.combiners) {
+		return newDebugTrace(
+			fmt.Sprintf("ALL combiners satisfied (%d)", len(layer.combiners)),
+		)
+	} else {
+		return newDebugTrace(
+			fmt.Sprintf("Combiners %s satisfied, %s NOT satisfied", satisfied, notSatisfied),
+		)
+	}
+}
+
+// idxList is a simple wrapper around a list of ints which
+// represent indexes. The main benefit is that we customize
+// how this list is converted to a string such that it looks
+// like [#0, #1, #2] rather than [0 1 2]
+type idxList []int
+
+func (list idxList) String() string {
+	str := strings.Builder{}
+	str.WriteString("[")
+	for idx, n := range list {
+		str.WriteString("#")
+		str.WriteString(fmt.Sprint(n))
+
+		if idx < len(list)-1 {
+			str.WriteString(", ")
+		}
+	}
+	str.WriteString("]")
+
+	return str.String()
 }

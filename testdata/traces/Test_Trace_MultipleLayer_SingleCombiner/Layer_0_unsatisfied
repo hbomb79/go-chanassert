@@ -7,14 +7,15 @@ Message 'world' - ACCEPTED:
       + Combiner status
         > EACH mode with minimum of 1 and maximum of 1
         > NOT satisfied
-          - [DEBUG] EACH matcher needs to match at least 1 messages, but matchers [0 2 3] have yet to match any messages
+          - [DEBUG] EACH matcher needs to match at least 1 messages, but matchers [#0, #2, #3] have yet to match any messages
         > NOT saturated
-          - [DEBUG] EACH matcher needs to match at least 1 messages, but matchers [0 2 3] have yet to match any messages
+          - [DEBUG] EACH matcher needs to match at least 1 messages, but matchers [#0, #2, #3] have yet to match any messages
         > [DEBUG] Matcher counts
           - Matcher #0 => 0 messages
           - Matcher #1 => 1 message(s)
           - Matcher #2 => 0 messages
           - Matcher #3 => 0 messages
+    * [DEBUG] No combiners satisfied (0 of 1)
 
 Message 'hello' - ACCEPTED:
   - Layer #0 matched message against combiner #0
@@ -23,14 +24,15 @@ Message 'hello' - ACCEPTED:
       + Combiner status
         > EACH mode with minimum of 1 and maximum of 1
         > NOT satisfied
-          - [DEBUG] EACH matcher needs to match at least 1 messages, but matchers [2 3] have yet to match any messages
+          - [DEBUG] EACH matcher needs to match at least 1 messages, but matchers [#2, #3] have yet to match any messages
         > NOT saturated
-          - [DEBUG] EACH matcher needs to match at least 1 messages, but matchers [2 3] have yet to match any messages
+          - [DEBUG] EACH matcher needs to match at least 1 messages, but matchers [#2, #3] have yet to match any messages
         > [DEBUG] Matcher counts
           - Matcher #0 => 1 message(s)
           - Matcher #1 => 1 message(s)
           - Matcher #2 => 0 messages
           - Matcher #3 => 0 messages
+    * [DEBUG] No combiners satisfied (0 of 1)
 
 Message 'ignore' - IGNORED:
   - Ignore matcher #0 ACCEPTED
@@ -44,11 +46,13 @@ Message 'foo' - ACCEPTED:
       + Combiner status
         > EACH mode with minimum of 1 and maximum of 1
         > NOT satisfied
-          - [DEBUG] EACH matcher needs to match at least 1 messages, but matchers [3] have yet to match any messages
+          - [DEBUG] EACH matcher needs to match at least 1 messages, but matchers [#3] have yet to match any messages
         > NOT saturated
-          - [DEBUG] EACH matcher needs to match at least 1 messages, but matchers [3] have yet to match any messages
+          - [DEBUG] EACH matcher needs to match at least 1 messages, but matchers [#3] have yet to match any messages
         > [DEBUG] Matcher counts
           - Matcher #0 => 1 message(s)
           - Matcher #1 => 1 message(s)
           - Matcher #2 => 1 message(s)
           - Matcher #3 => 0 messages
+    * [DEBUG] No combiners satisfied (0 of 1)
+

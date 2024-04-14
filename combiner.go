@@ -173,7 +173,7 @@ func (nCombiner *nCombiner[T]) updateSaturation() TraceMessage {
 		if len(nCombiner.counts) != len(nCombiner.matchers) {
 			nCombiner.saturated = false
 
-			missing := make([]int, 0)
+			missing := make(idxList, 0)
 			for idx := range nCombiner.matchers {
 				if _, ok := nCombiner.counts[idx]; !ok {
 					missing = append(missing, idx)
@@ -183,7 +183,7 @@ func (nCombiner *nCombiner[T]) updateSaturation() TraceMessage {
 			return generateTrace(false, fmt.Sprintf("EACH matcher needs to match at least %d messages, but matchers %v have yet to match any messages", nCombiner.max, missing))
 		}
 
-		notSaturated := make([]int, 0)
+		notSaturated := make(idxList, 0)
 		for idx, c := range nCombiner.counts {
 			if c < nCombiner.max {
 				notSaturated = append(notSaturated, idx)
@@ -192,22 +192,22 @@ func (nCombiner *nCombiner[T]) updateSaturation() TraceMessage {
 
 		nCombiner.saturated = len(notSaturated) == 0
 		if nCombiner.saturated {
-			return generateTrace(true, fmt.Sprintf("All matchers have matched maximum allowed messages (%d)", nCombiner.max))
+			return generateTrace(true, fmt.Sprintf("EACH matcher has matched maximum allowed messages (%d)", nCombiner.max))
 		}
 
 		return generateTrace(false, fmt.Sprintf("EACH matcher needs to match at least %d messages, but matchers %v have not", nCombiner.max, notSaturated))
 	case modeAny:
 		// In 'any' mode, the combiner is saturated when any ONE matcher has consumed the maximum
-		for _, c := range nCombiner.counts {
+		for idx, c := range nCombiner.counts {
 			if c >= nCombiner.max {
 				nCombiner.saturated = true
 
-				return generateTrace(true, fmt.Sprintf("Matcher #%d has matched against maximum messages", nCombiner.max))
+				return generateTrace(true, fmt.Sprintf("Matcher #%d has matched against maximum messages (%d)", idx, nCombiner.max))
 			}
 		}
 
 		nCombiner.saturated = false
-		return generateTrace(false, fmt.Sprintf("ANY matcher needs to match at least %d messages, but none have", nCombiner.max))
+		return generateTrace(false, fmt.Sprintf("ANY matcher needs to match %d messages, but none have", nCombiner.max))
 	case modeSum:
 		// In 'sum' mode, the combiner is saturated when the sum of matched messages has reached the maximum
 		sum := nCombiner.sumMatches()
@@ -223,8 +223,8 @@ func (nCombiner *nCombiner[T]) updateSaturation() TraceMessage {
 }
 
 func (nCombiner *nCombiner[T]) updateSatisifed() TraceMessage {
-	generateTrace := func(isSaturated bool, reason string) TraceMessage {
-		if isSaturated {
+	generateTrace := func(isSatisfied bool, reason string) TraceMessage {
+		if isSatisfied {
 			return newInfoTrace("Satisfied", newDebugTrace(reason))
 		} else {
 			return newInfoTrace("NOT satisfied", newDebugTrace(reason))
@@ -237,7 +237,7 @@ func (nCombiner *nCombiner[T]) updateSatisifed() TraceMessage {
 		if len(nCombiner.counts) != len(nCombiner.matchers) {
 			nCombiner.satisfied = false
 
-			missing := make([]int, 0)
+			missing := make(idxList, 0)
 			for idx := range nCombiner.matchers {
 				if _, ok := nCombiner.counts[idx]; !ok {
 					missing = append(missing, idx)
@@ -247,7 +247,7 @@ func (nCombiner *nCombiner[T]) updateSatisifed() TraceMessage {
 			return generateTrace(false, fmt.Sprintf("EACH matcher needs to match at least %d messages, but matchers %v have yet to match any messages", nCombiner.min, missing))
 		}
 
-		notSatisfied := make([]int, 0)
+		notSatisfied := make(idxList, 0)
 		for idx, c := range nCombiner.counts {
 			if c < nCombiner.min || c > nCombiner.max {
 				notSatisfied = append(notSatisfied, idx)

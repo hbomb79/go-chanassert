@@ -1,0 +1,174 @@
+EXPECTER: trace of processed messages follow:
+Message 'hello' - ACCEPTED:
+  - Layer #0 matched message against combiner #0
+    * Combiner #0: Combiner matched on matcher #0
+      + Matcher #0 ACCEPT
+      + Combiner status
+        > EACH mode with minimum of 1 and maximum of 1
+        > NOT satisfied
+          - [DEBUG] EACH matcher needs to match at least 1 messages, but matchers [#1] have yet to match any messages
+        > NOT saturated
+          - [DEBUG] EACH matcher needs to match at least 1 messages, but matchers [#1] have yet to match any messages
+        > [DEBUG] Matcher counts
+          - Matcher #0 => 1 message(s)
+          - Matcher #1 => 0 messages
+    * [DEBUG] Layer Status
+      + "AND" mode
+      + NOT satisfied: no combiners satisfied (of 2)
+
+Message 'world' - ACCEPTED:
+  - Layer #0 matched message against combiner #0
+    * Combiner #0: Combiner matched on matcher #1
+      + Matcher #0 REJECT: no match
+      + Matcher #1 ACCEPT
+      + Combiner status
+        > EACH mode with minimum of 1 and maximum of 1
+        > Satisfied
+          - [DEBUG] EACH matcher has matched at least 1 messages
+        > Saturated
+          - [DEBUG] EACH matcher has matched maximum allowed messages (1)
+        > [DEBUG] Matcher counts
+          - Matcher #0 => 1 message(s)
+          - Matcher #1 => 1 message(s)
+    * [DEBUG] Layer Status
+      + "AND" mode
+      + NOT satisfied: only combiners [#0] satisfied, [#1] NOT yet satisfied
+
+Message 'reject' - REJECTED:
+  - Layer #0 could not match message against any combiners
+    * Combiner #0: Combiner is fully saturated, accepting no further messages
+      + Combiner status
+        > EACH mode with minimum of 1 and maximum of 1
+        > Satisfied
+          - [DEBUG] EACH matcher has matched at least 1 messages
+        > Saturated
+          - [DEBUG] EACH matcher has matched maximum allowed messages (1)
+        > [DEBUG] Matcher counts
+          - Matcher #0 => 1 message(s)
+          - Matcher #1 => 1 message(s)
+    * Combiner #1: Combiner failed match message
+      + Matcher #0 REJECT: no match
+      + Matcher #1 REJECT: no match
+      + Combiner status
+        > ANY mode with minimum of 2 and maximum of 2
+        > NOT satisfied
+          - [DEBUG] ANY matcher needs to match at least 2 messages, but none have
+        > NOT saturated
+          - [DEBUG] ANY matcher needs to match 2 messages, but none have
+        > [DEBUG] Matcher counts
+          - Matcher #0 => 0 messages
+          - Matcher #1 => 0 messages
+    * [DEBUG] Layer Status
+      + "AND" mode
+      + NOT satisfied: only combiners [#0] satisfied, [#1] NOT yet satisfied
+
+Message 'foo' - ACCEPTED:
+  - Layer #0 matched message against combiner #1
+    * Combiner #0: Combiner is fully saturated, accepting no further messages
+      + Combiner status
+        > EACH mode with minimum of 1 and maximum of 1
+        > Satisfied
+          - [DEBUG] EACH matcher has matched at least 1 messages
+        > Saturated
+          - [DEBUG] EACH matcher has matched maximum allowed messages (1)
+        > [DEBUG] Matcher counts
+          - Matcher #0 => 1 message(s)
+          - Matcher #1 => 1 message(s)
+    * Combiner #1: Combiner matched on matcher #0
+      + Matcher #0 ACCEPT
+      + Combiner status
+        > ANY mode with minimum of 2 and maximum of 2
+        > NOT satisfied
+          - [DEBUG] ANY matcher needs to match at least 2 messages, but none have
+        > NOT saturated
+          - [DEBUG] ANY matcher needs to match 2 messages, but none have
+        > [DEBUG] Matcher counts
+          - Matcher #0 => 1 message(s)
+          - Matcher #1 => 0 messages
+    * [DEBUG] Layer Status
+      + "AND" mode
+      + NOT satisfied: only combiners [#0] satisfied, [#1] NOT yet satisfied
+
+Message 'bar' - ACCEPTED:
+  - Layer #0 matched message against combiner #1
+    * Combiner #0: Combiner is fully saturated, accepting no further messages
+      + Combiner status
+        > EACH mode with minimum of 1 and maximum of 1
+        > Satisfied
+          - [DEBUG] EACH matcher has matched at least 1 messages
+        > Saturated
+          - [DEBUG] EACH matcher has matched maximum allowed messages (1)
+        > [DEBUG] Matcher counts
+          - Matcher #0 => 1 message(s)
+          - Matcher #1 => 1 message(s)
+    * Combiner #1: Combiner matched on matcher #1
+      + Matcher #0 REJECT: no match
+      + Matcher #1 ACCEPT
+      + Combiner status
+        > ANY mode with minimum of 2 and maximum of 2
+        > NOT satisfied
+          - [DEBUG] ANY matcher needs to match at least 2 messages, but none have
+        > NOT saturated
+          - [DEBUG] ANY matcher needs to match 2 messages, but none have
+        > [DEBUG] Matcher counts
+          - Matcher #0 => 1 message(s)
+          - Matcher #1 => 1 message(s)
+    * [DEBUG] Layer Status
+      + "AND" mode
+      + NOT satisfied: only combiners [#0] satisfied, [#1] NOT yet satisfied
+
+Message 'reject' - REJECTED:
+  - Layer #0 could not match message against any combiners
+    * Combiner #0: Combiner is fully saturated, accepting no further messages
+      + Combiner status
+        > EACH mode with minimum of 1 and maximum of 1
+        > Satisfied
+          - [DEBUG] EACH matcher has matched at least 1 messages
+        > Saturated
+          - [DEBUG] EACH matcher has matched maximum allowed messages (1)
+        > [DEBUG] Matcher counts
+          - Matcher #0 => 1 message(s)
+          - Matcher #1 => 1 message(s)
+    * Combiner #1: Combiner failed match message
+      + Matcher #0 REJECT: no match
+      + Matcher #1 REJECT: no match
+      + Combiner status
+        > ANY mode with minimum of 2 and maximum of 2
+        > NOT satisfied
+          - [DEBUG] ANY matcher needs to match at least 2 messages, but none have
+        > NOT saturated
+          - [DEBUG] ANY matcher needs to match 2 messages, but none have
+        > [DEBUG] Matcher counts
+          - Matcher #0 => 1 message(s)
+          - Matcher #1 => 1 message(s)
+    * [DEBUG] Layer Status
+      + "AND" mode
+      + NOT satisfied: only combiners [#0] satisfied, [#1] NOT yet satisfied
+
+Message 'foo' - ACCEPTED:
+  - Layer #0 matched message against combiner #1
+    * Combiner #0: Combiner is fully saturated, accepting no further messages
+      + Combiner status
+        > EACH mode with minimum of 1 and maximum of 1
+        > Satisfied
+          - [DEBUG] EACH matcher has matched at least 1 messages
+        > Saturated
+          - [DEBUG] EACH matcher has matched maximum allowed messages (1)
+        > [DEBUG] Matcher counts
+          - Matcher #0 => 1 message(s)
+          - Matcher #1 => 1 message(s)
+    * Combiner #1: Combiner matched on matcher #0
+      + Matcher #0 ACCEPT
+      + Combiner status
+        > ANY mode with minimum of 2 and maximum of 2
+        > Satisfied
+          - [DEBUG] Matcher #0 has matched against minimum messages (2)
+        > Saturated
+          - [DEBUG] Matcher #0 has matched against maximum messages (2)
+        > [DEBUG] Matcher counts
+          - Matcher #0 => 2 message(s)
+          - Matcher #1 => 1 message(s)
+    * [DEBUG] Layer Status
+      + "AND" mode
+      + SATISFIED: all combiners satisfied (2)
+

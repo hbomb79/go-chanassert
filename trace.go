@@ -47,35 +47,35 @@ func (msg TraceMessage) PrintTrace(writer io.Writer, nestLevel int) {
 	}
 }
 
-type messageStatus int
+type MessageStatus int
 
 const (
-	accepted messageStatus = iota
-	ignored
-	rejected
+	Accepted MessageStatus = iota
+	Ignored
+	Rejected
 )
 
-func (m messageStatus) String() string {
+func (m MessageStatus) String() string {
 	//exhaustive:enforce
 	switch m {
-	case accepted:
+	case Accepted:
 		return "ACCEPTED"
-	case ignored:
+	case Ignored:
 		return "IGNORED"
-	case rejected:
+	case Rejected:
 		return "REJECTED"
 	}
 
 	panic("unreachable")
 }
 
-type messageResult[T any] struct {
+type MessageResult[T any] struct {
 	Message T
-	Status  messageStatus
+	Status  MessageStatus
 	Trace   TraceMessage
 }
 
-func (result messageResult[T]) PrettyPrint(writer io.Writer) {
+func (result MessageResult[T]) PrettyPrint(writer io.Writer) {
 	fmt.Fprintf(writer, "Message '%+v' - %s:\n", result.Message, result.Status)
 
 	result.Trace.PrintTrace(writer, 0)

@@ -35,8 +35,7 @@ not be satisfied, and will cause the test to fail.
 Let's breakdown what's going on here:
  - `Expect` defines a new 'layer', which is a concept in chanassert which enables you to define an ordering to your expectations.
  - `AllOf` is a 'combiner', which allows you to combine multiple matchers together.
- - `MatchEqual` is an example of a matcher. It takes in a value and will 'accept' a message only if it shallowly equals the value you provide.
- Chanassert comes with many different matchers, and creating your own is very simple.
+ - `MatchEqual` is an example of a matcher. It takes in a value and will 'accept' a message only if it equals the value you provide (only available if your expecter is generic over a `comparable` type).
  - `Listen` starts the expecter, which will start a goroutine which consumes messages from the channel until the expecter closes (more on that in 'Lifecycle of the Expecter')
  - `AssertSatisfied` will wait for the expecter to close (or force-close it after the timeout provided), and checks for any errors recorded by the expecter. If any are found, the given `testing.T` will be failed.
 
@@ -136,7 +135,7 @@ yourself an any-type combiner.
 Matchers are the building block of your assertions. They are used in conjunction with combiners and layers to define your expectations.
 
 Chanassert comes with many matchers, here's a few of the common ones:
-- `MatchEqual`, matches messages using simple shallow matching,
+- `MatchEqual`, matches messages which are 'equal' (using `==` comparison, and so only available if your expecter is generic over a `comparable` type).
 - `MatchStruct`, matches messages using deep equality (via reflection),
 - `MatchPredicate`, matches messages using the predicate function,
 - `MatchStructPartial`, matches messages by comparing all _non-zero values_ in the provided struct and checking that the values match those found in the message,

@@ -63,16 +63,16 @@ func assertTraceExpected(t *testing.T, expecter chanassert.Expecter[string]) {
 
 func runTraceTests(t *testing.T, makeExpecter func() (chan string, chanassert.Expecter[string]), tests []traceTest) {
 	for _, data := range tests {
-		t.Run(data.Summary, func(t *testing.T) {
+		t.Run(data.summary, func(t *testing.T) {
 			t.Parallel()
 
 			ch, expecter := makeExpecter()
 			expecter.Listen()
-			for _, m := range data.Messages {
+			for _, m := range data.messages {
 				ch <- m.str
 			}
 
-			if data.ShouldBeSatisfied {
+			if data.shouldBeSatisfied {
 				expecter.AssertSatisfied(t, time.Second)
 			} else {
 				errors := expecter.AwaitSatisfied(time.Second)
@@ -82,10 +82,10 @@ func runTraceTests(t *testing.T, makeExpecter func() (chan string, chanassert.Ex
 			}
 
 			results := expecter.ProcessedMessages()
-			if len(results) != len(data.Messages) {
-				t.Errorf("Number of processed message results (%d) did not match expected (%d)", len(results), len(data.Messages))
+			if len(results) != len(data.messages) {
+				t.Errorf("Number of processed message results (%d) did not match expected (%d)", len(results), len(data.messages))
 			} else {
-				for idx, msg := range data.Messages {
+				for idx, msg := range data.messages {
 					expected := msg.traceStatus
 					actual := results[idx].Status
 
@@ -107,9 +107,9 @@ type message struct {
 }
 
 type traceTest struct {
-	Summary           string
-	Messages          []message
-	ShouldBeSatisfied bool
+	summary           string
+	messages          []message
+	shouldBeSatisfied bool
 }
 
 func Test_Trace_MultipleLayer_SingleCombiner(t *testing.T) {
@@ -132,8 +132,8 @@ func Test_Trace_MultipleLayer_SingleCombiner(t *testing.T) {
 
 	tests := []traceTest{
 		{
-			Summary: "Expected in order",
-			Messages: []message{
+			summary: "Expected in order",
+			messages: []message{
 				{"hello", chanassert.Accepted},
 				{"world", chanassert.Accepted},
 				{"foo", chanassert.Accepted},
@@ -142,11 +142,11 @@ func Test_Trace_MultipleLayer_SingleCombiner(t *testing.T) {
 				{"world", chanassert.Accepted},
 				{"world", chanassert.Accepted},
 			},
-			ShouldBeSatisfied: true,
+			shouldBeSatisfied: true,
 		},
 		{
-			Summary: "Expected out of order",
-			Messages: []message{
+			summary: "Expected out of order",
+			messages: []message{
 				{"world", chanassert.Accepted},
 				{"hello", chanassert.Accepted},
 				{"bar", chanassert.Accepted},
@@ -154,21 +154,21 @@ func Test_Trace_MultipleLayer_SingleCombiner(t *testing.T) {
 				{"world", chanassert.Accepted},
 				{"world", chanassert.Accepted},
 			},
-			ShouldBeSatisfied: true,
+			shouldBeSatisfied: true,
 		},
 		{
-			Summary: "Layer 0 unsatisfied",
-			Messages: []message{
+			summary: "Layer 0 unsatisfied",
+			messages: []message{
 				{"world", chanassert.Accepted},
 				{"hello", chanassert.Accepted},
 				{"ignore", chanassert.Ignored},
 				{"foo", chanassert.Accepted},
 			},
-			ShouldBeSatisfied: false,
+			shouldBeSatisfied: false,
 		},
 		{
-			Summary: "Layer 1 unsatisfied",
-			Messages: []message{
+			summary: "Layer 1 unsatisfied",
+			messages: []message{
 				{"world", chanassert.Accepted},
 				{"hello", chanassert.Accepted},
 				{"ignore", chanassert.Ignored},
@@ -176,7 +176,7 @@ func Test_Trace_MultipleLayer_SingleCombiner(t *testing.T) {
 				{"bar", chanassert.Accepted},
 				{"hello", chanassert.Accepted},
 			},
-			ShouldBeSatisfied: false,
+			shouldBeSatisfied: false,
 		},
 	}
 
@@ -203,30 +203,30 @@ func Test_Trace_SingleLayer_MultipleCombiner(t *testing.T) {
 
 	tests := []traceTest{
 		{
-			Summary: "Messages delivered in order",
-			Messages: []message{
+			summary: "Messages delivered in order",
+			messages: []message{
 				{"hello", chanassert.Accepted},
 				{"world", chanassert.Accepted},
 				{"foo", chanassert.Accepted},
 				{"bar", chanassert.Accepted},
 				{"foo", chanassert.Accepted},
 			},
-			ShouldBeSatisfied: true,
+			shouldBeSatisfied: true,
 		},
 		{
-			Summary: "Messages delivered out of order",
-			Messages: []message{
+			summary: "Messages delivered out of order",
+			messages: []message{
 				{"bar", chanassert.Accepted},
 				{"foo", chanassert.Accepted},
 				{"hello", chanassert.Accepted},
 				{"foo", chanassert.Accepted},
 				{"world", chanassert.Accepted},
 			},
-			ShouldBeSatisfied: true,
+			shouldBeSatisfied: true,
 		},
 		{
-			Summary: "Messages delivered with rejections",
-			Messages: []message{
+			summary: "Messages delivered with rejections",
+			messages: []message{
 				{"hello", chanassert.Accepted},
 				{"world", chanassert.Accepted},
 				{"reject", chanassert.Rejected},
@@ -235,37 +235,37 @@ func Test_Trace_SingleLayer_MultipleCombiner(t *testing.T) {
 				{"reject", chanassert.Rejected},
 				{"foo", chanassert.Accepted},
 			},
-			ShouldBeSatisfied: false,
+			shouldBeSatisfied: false,
 		},
 		{
-			Summary: "Messages for first combiner",
-			Messages: []message{
+			summary: "Messages for first combiner",
+			messages: []message{
 				{"world", chanassert.Accepted},
 				{"hello", chanassert.Accepted},
 				{"ignore", chanassert.Ignored},
 			},
-			ShouldBeSatisfied: false,
+			shouldBeSatisfied: false,
 		},
 		{
-			Summary: "Too many messages for first combiner",
-			Messages: []message{
+			summary: "Too many messages for first combiner",
+			messages: []message{
 				{"hello", chanassert.Accepted},
 				{"world", chanassert.Accepted},
 				{"ignore", chanassert.Ignored},
 				{"hello", chanassert.Rejected},
 				{"world", chanassert.Rejected},
 			},
-			ShouldBeSatisfied: false,
+			shouldBeSatisfied: false,
 		},
 		{
-			Summary: "Messages for second combiner",
-			Messages: []message{
+			summary: "Messages for second combiner",
+			messages: []message{
 				{"foo", chanassert.Accepted},
 				{"bar", chanassert.Accepted},
 				{"ignore", chanassert.Ignored},
 				{"bar", chanassert.Accepted},
 			},
-			ShouldBeSatisfied: false,
+			shouldBeSatisfied: false,
 		},
 	}
 
@@ -305,8 +305,8 @@ func Test_Trace_MultipleLayer_MultipleCombiner(t *testing.T) {
 
 	tests := []traceTest{
 		{
-			Summary: "Messages delivered in order (A)",
-			Messages: []message{
+			summary: "Messages delivered in order (A)",
+			messages: []message{
 				// Layer 0
 				{"hello", chanassert.Accepted},
 				{"world", chanassert.Accepted},
@@ -316,11 +316,11 @@ func Test_Trace_MultipleLayer_MultipleCombiner(t *testing.T) {
 				// Layer 1
 				{"a", chanassert.Accepted},
 			},
-			ShouldBeSatisfied: true,
+			shouldBeSatisfied: true,
 		},
 		{
-			Summary: "Messages delivered in order (Z)",
-			Messages: []message{
+			summary: "Messages delivered in order (Z)",
+			messages: []message{
 				// Layer 0
 				{"hello", chanassert.Accepted},
 				{"world", chanassert.Accepted},
@@ -330,11 +330,11 @@ func Test_Trace_MultipleLayer_MultipleCombiner(t *testing.T) {
 				// Layer 1
 				{"z", chanassert.Accepted},
 			},
-			ShouldBeSatisfied: true,
+			shouldBeSatisfied: true,
 		},
 		{
-			Summary: "Messages delivered out of order",
-			Messages: []message{
+			summary: "Messages delivered out of order",
+			messages: []message{
 				// Layer 0
 				{"bar", chanassert.Accepted},
 				{"foo", chanassert.Accepted},
@@ -344,11 +344,11 @@ func Test_Trace_MultipleLayer_MultipleCombiner(t *testing.T) {
 				// Layer 1
 				{"b", chanassert.Accepted},
 			},
-			ShouldBeSatisfied: true,
+			shouldBeSatisfied: true,
 		},
 		{
-			Summary: "Messages delivered with rejections",
-			Messages: []message{
+			summary: "Messages delivered with rejections",
+			messages: []message{
 				// Layer 0
 				{"hello", chanassert.Accepted},
 				{"world", chanassert.Accepted},
@@ -361,20 +361,20 @@ func Test_Trace_MultipleLayer_MultipleCombiner(t *testing.T) {
 				{"d", chanassert.Rejected},
 				{"y", chanassert.Accepted},
 			},
-			ShouldBeSatisfied: false,
+			shouldBeSatisfied: false,
 		},
 		{
-			Summary: "Messages for first combiner of first layer",
-			Messages: []message{
+			summary: "Messages for first combiner of first layer",
+			messages: []message{
 				{"world", chanassert.Accepted},
 				{"hello", chanassert.Accepted},
 				{"ignore", chanassert.Ignored},
 			},
-			ShouldBeSatisfied: false,
+			shouldBeSatisfied: false,
 		},
 		{
-			Summary: "Messages for first combiner of second layer",
-			Messages: []message{
+			summary: "Messages for first combiner of second layer",
+			messages: []message{
 				// Layer 0
 				{"hello", chanassert.Accepted},
 				{"world", chanassert.Accepted},
@@ -384,11 +384,11 @@ func Test_Trace_MultipleLayer_MultipleCombiner(t *testing.T) {
 				// Layer 1
 				{"c", chanassert.Accepted},
 			},
-			ShouldBeSatisfied: true,
+			shouldBeSatisfied: true,
 		},
 		{
-			Summary: "Messages for second combiner of second layer",
-			Messages: []message{
+			summary: "Messages for second combiner of second layer",
+			messages: []message{
 				// Layer 0
 				{"hello", chanassert.Accepted},
 				{"world", chanassert.Accepted},
@@ -398,28 +398,28 @@ func Test_Trace_MultipleLayer_MultipleCombiner(t *testing.T) {
 				// Layer 1
 				{"x", chanassert.Accepted},
 			},
-			ShouldBeSatisfied: true,
+			shouldBeSatisfied: true,
 		},
 		{
-			Summary: "Too many messages for first combiner",
-			Messages: []message{
+			summary: "Too many messages for first combiner",
+			messages: []message{
 				{"hello", chanassert.Accepted},
 				{"world", chanassert.Accepted},
 				{"ignore", chanassert.Ignored},
 				{"hello", chanassert.Rejected},
 				{"world", chanassert.Rejected},
 			},
-			ShouldBeSatisfied: false,
+			shouldBeSatisfied: false,
 		},
 		{
-			Summary: "Messages for first layer, second combiner",
-			Messages: []message{
+			summary: "Messages for first layer, second combiner",
+			messages: []message{
 				{"foo", chanassert.Accepted},
 				{"bar", chanassert.Accepted},
 				{"ignore", chanassert.Ignored},
 				{"bar", chanassert.Accepted},
 			},
-			ShouldBeSatisfied: false,
+			shouldBeSatisfied: false,
 		},
 	}
 

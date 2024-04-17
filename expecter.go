@@ -10,7 +10,6 @@ import (
 	"os"
 	"strings"
 	"sync"
-	"testing"
 	"time"
 )
 
@@ -109,7 +108,7 @@ type Expecter[T any] interface {
 
 	Ignore(matchers ...Matcher[T]) Expecter[T]
 
-	AssertSatisfied(t *testing.T, timeout time.Duration)
+	AssertSatisfied(t TestingT, timeout time.Duration)
 	AwaitSatisfied(timeout time.Duration) Errors
 
 	PrintTrace()
@@ -338,12 +337,22 @@ func (exp *expecter[T]) AwaitSatisfied(timeout time.Duration) Errors {
 	return outErr
 }
 
+// TestingT is a minimal interface which mimics the standard
+// [testing.T] struct. This is used in places that chanassert accepts
+// a testing.T in order to allow unit testing of it's behaviour.
+type TestingT interface {
+	Errorf(format string, args ...any)
+	Logf(format string, args ...any)
+	Error(args ...any)
+	Log(args ...any)
+}
+
 // AssertSatisfied ...
 // expecter error: received messages which could not be matched (8 messages, across 2 layers).
 // expecter error: layer #0: unexpected message: ”
 // expecter error: layer #1: unexpected message: ”
 // expecter error: failed to become satisfied: HINT: use .Debug() on your expecter to enable verbose message tracing.
-func (exp *expecter[T]) AssertSatisfied(t *testing.T, timeout time.Duration) {
+func (exp *expecter[T]) AssertSatisfied(t TestingT, timeout time.Duration) {
 	layers := make(map[int]struct{})
 	rejections := 0
 	errs := exp.AwaitSatisfied(timeout)
@@ -377,6 +386,8 @@ func (exp *expecter[T]) AssertSatisfied(t *testing.T, timeout time.Duration) {
 
 	if len(errs) > 0 {
 		if exp.debug {
+			t.Errorf("expecter error: failed to become satisfied")
+
 			stringBuilder := &strings.Builder{}
 			stringBuilder.WriteString("EXPECTER: DEBUG enabled: trace of processed messages follow:\n")
 			exp.FPrintTrace(stringBuilder)

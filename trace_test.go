@@ -96,7 +96,6 @@ func runTraceTests(t *testing.T, makeExpecter func() (chan string, chanassert.Ex
 			}
 
 			assertTraceExpected(t, expecter)
-			expecter.PrintTrace()
 		})
 	}
 }

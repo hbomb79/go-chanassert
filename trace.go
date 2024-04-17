@@ -70,9 +70,10 @@ func (m MessageStatus) String() string {
 }
 
 type MessageResult[T any] struct {
-	Message T
-	Status  MessageStatus
-	Trace   TraceMessage
+	Message  T
+	LayerIdx int
+	Status   MessageStatus
+	Trace    TraceMessage
 }
 
 func (result MessageResult[T]) PrettyPrint(writer io.Writer) {

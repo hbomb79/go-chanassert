@@ -14,19 +14,29 @@ type delayMessage[T any] struct {
 	message T
 }
 
-type expectedErrors []error
+type (
+	expectedError  int
+	expectedErrors []expectedError
+)
 
-func (exp expectedErrors) String() string {
-	str := strings.Builder{}
-	str.WriteString("[\n")
+const (
+	rejectedError expectedError = iota
+	unsatisfiedError
+	terminatedError
+)
+
+func (expectedError expectedError) String() string {
+	return []string{"rejected error", "unsatisfied error", "terminated error"}[expectedError]
+}
+
+func (exp expectedErrors) contains(err expectedError) bool {
 	for _, e := range exp {
-		str.WriteString("  \"")
-		str.WriteString(e.Error())
-		str.WriteString("\",\n")
+		if e == err {
+			return true
+		}
 	}
-	str.WriteString("]\n")
 
-	return str.String()
+	return false
 }
 
 type expecterTest[T any] struct {
@@ -34,13 +44,13 @@ type expecterTest[T any] struct {
 	Messages      []T
 	DelayMessages []delayMessage[T]
 
-	// ExpectedErrors contains the wrapped errors we expect the expecter to return. These
+	// ExpectedErrors contains the error types we expect the expecter to return. These
 	// errors can cover all possibilities, such as unexpected messages, timeout cancellation,
 	// and unsatisfied layers. An empty slice will enforce that there were no errors returned.
 	ExpectedErrors expectedErrors
 }
 
-func assertErrorsExpected(t *testing.T, errs chanassert.Errors, expected expectedErrors) {
+func assertErrorsExpected[T any](t *testing.T, errs chanassert.Errors, expected expectedErrors) {
 	if len(errs) == 0 && len(expected) == 0 {
 		return
 	}
@@ -52,24 +62,37 @@ func assertErrorsExpected(t *testing.T, errs chanassert.Errors, expected expecte
 
 	// Check that all errors returned are EXPECTED, fail if
 	// any errors are not, or if any expected errors were not seen.
-	outstanding := make(map[error]struct{})
+	outstanding := make(map[expectedError]struct{})
 	for _, e := range expected {
 		outstanding[e] = struct{}{}
 	}
 
 	for _, err := range errs {
-		found := false
-		for _, expErr := range expected {
-			if errors.Is(err, expErr) {
-				delete(outstanding, expErr)
-				found = true
-				break
+		if expected.contains(rejectedError) {
+			rejErr := &chanassert.RejectionError[T]{}
+			if errors.As(err, rejErr) {
+				delete(outstanding, rejectedError)
+				continue
 			}
 		}
 
-		if !found {
-			t.Errorf("error '%s' returned, but NOT expected", err)
+		if expected.contains(unsatisfiedError) {
+			unsatisErr := &chanassert.UnsatisfiedError{}
+			if errors.As(err, unsatisErr) {
+				delete(outstanding, unsatisfiedError)
+				continue
+			}
 		}
+
+		if expected.contains(terminatedError) {
+			terminatedErr := &chanassert.TerminatedError{}
+			if errors.As(err, terminatedErr) {
+				delete(outstanding, terminatedError)
+				continue
+			}
+		}
+
+		t.Errorf("error '%s' returned by expecter, but NOT expected", err)
 	}
 
 	if len(outstanding) != 0 {
@@ -113,7 +136,7 @@ func runExpecterTests[T any](t *testing.T, makeExpecter func() (chan T, chanasse
 			}
 
 			errs := expecter.AwaitSatisfied(time.Second)
-			assertErrorsExpected(t, errs, test.ExpectedErrors)
+			assertErrorsExpected[T](t, errs, test.ExpectedErrors)
 		})
 	}
 }
@@ -123,22 +146,22 @@ func Test_SingleCombiner(t *testing.T) {
 		{
 			Summary:        "Expected messages delivered",
 			Messages:       []string{"foo", "hello", "world"},
-			ExpectedErrors: []error{},
+			ExpectedErrors: []expectedError{},
 		},
 		{
 			Summary:        "Expected messages delivered, with some unexpected",
 			Messages:       []string{"hello", "world", "bar", "foo"},
-			ExpectedErrors: []error{chanassert.ErrRejectedMessage},
+			ExpectedErrors: []expectedError{rejectedError},
 		},
 		{
 			Summary:        "Insufficient expected messages",
 			Messages:       []string{"hello", "world"},
-			ExpectedErrors: []error{chanassert.ErrActiveLayerUnsatisfied, chanassert.ErrUnsatisfiedExpecter},
+			ExpectedErrors: []expectedError{unsatisfiedError, terminatedError},
 		},
 		{
 			Summary:        "Insufficient expected message, with unexpected messages",
 			Messages:       []string{"hello", "bar", "world"},
-			ExpectedErrors: []error{chanassert.ErrRejectedMessage, chanassert.ErrUnsatisfiedExpecter, chanassert.ErrActiveLayerUnsatisfied},
+			ExpectedErrors: []expectedError{rejectedError, terminatedError, unsatisfiedError},
 		},
 	}
 
@@ -179,35 +202,35 @@ func Test_SingleCombiner_Timeout(t *testing.T) {
 			DelayMessages: []delayMessage[string]{
 				{0, "foo"}, {0, "hello"}, {0, "world"},
 			},
-			ExpectedErrors: []error{},
+			ExpectedErrors: []expectedError{},
 		},
 		{
 			Summary: "Expected messages delivered, but after timeout",
 			DelayMessages: []delayMessage[string]{
 				{0, "foo"}, {300 * time.Millisecond, "hello"}, {300 * time.Millisecond, "world"},
 			},
-			ExpectedErrors: []error{chanassert.ErrActiveLayerUnsatisfied, chanassert.ErrRejectedMessage, chanassert.ErrUnsatisfiedExpecter},
+			ExpectedErrors: []expectedError{unsatisfiedError, rejectedError, terminatedError},
 		},
 		{
 			Summary: "Expected messages delivered, with some unexpected",
 			DelayMessages: []delayMessage[string]{
 				{0, "hello"}, {0, "world"}, {0, "bar"}, {0, "foo"},
 			},
-			ExpectedErrors: []error{chanassert.ErrRejectedMessage},
+			ExpectedErrors: []expectedError{rejectedError},
 		},
 		{
 			Summary: "Insufficient expected messages",
 			DelayMessages: []delayMessage[string]{
 				{0, "hello"}, {0, "world"},
 			},
-			ExpectedErrors: []error{chanassert.ErrActiveLayerUnsatisfied, chanassert.ErrUnsatisfiedExpecter},
+			ExpectedErrors: []expectedError{unsatisfiedError, terminatedError},
 		},
 		{
 			Summary: "Insufficient expected messages, with unexpected messages",
 			DelayMessages: []delayMessage[string]{
 				{0, "hello"}, {0, "bar"}, {0, "world"},
 			},
-			ExpectedErrors: []error{chanassert.ErrRejectedMessage, chanassert.ErrUnsatisfiedExpecter, chanassert.ErrActiveLayerUnsatisfied},
+			ExpectedErrors: []expectedError{rejectedError, terminatedError, unsatisfiedError},
 		},
 	}
 
@@ -263,32 +286,32 @@ func Test_Expect_MultipleCombiner(t *testing.T) {
 		{
 			Summary:        "Expected messages delivered",
 			Messages:       []string{"foo", "hello", "world", "second"},
-			ExpectedErrors: []error{},
+			ExpectedErrors: []expectedError{},
 		},
 		{
 			Summary:        "Expected messages delivered out of order",
 			Messages:       []string{"2nd", "foo", "hello", "world"},
-			ExpectedErrors: []error{},
+			ExpectedErrors: []expectedError{},
 		},
 		{
 			Summary:        "Expected messages delivered, with some unexpected",
 			Messages:       []string{"hello", "world", "second", "bar", "foo"},
-			ExpectedErrors: []error{chanassert.ErrRejectedMessage},
+			ExpectedErrors: []expectedError{rejectedError},
 		},
 		{
 			Summary:        "Insufficient expected messages",
 			Messages:       []string{"hello", "world"},
-			ExpectedErrors: []error{chanassert.ErrActiveLayerUnsatisfied, chanassert.ErrUnsatisfiedExpecter},
+			ExpectedErrors: []expectedError{unsatisfiedError, terminatedError},
 		},
 		{
 			Summary:        "Insufficient expected messages for both combiners, with unexpected messages",
 			Messages:       []string{"hello", "bar", "world"},
-			ExpectedErrors: []error{chanassert.ErrRejectedMessage, chanassert.ErrUnsatisfiedExpecter, chanassert.ErrActiveLayerUnsatisfied},
+			ExpectedErrors: []expectedError{rejectedError, terminatedError, unsatisfiedError},
 		},
 		{
 			Summary:        "One combiner satisfied",
 			Messages:       []string{"world", "second", "hello"},
-			ExpectedErrors: []error{chanassert.ErrUnsatisfiedExpecter, chanassert.ErrActiveLayerUnsatisfied},
+			ExpectedErrors: []expectedError{terminatedError, unsatisfiedError},
 		},
 	}
 
@@ -317,35 +340,35 @@ func Test_ExpectTimeout_MultipleCombiner(t *testing.T) {
 			DelayMessages: []delayMessage[string]{
 				{0, "foo"}, {0, "hello"}, {0, "world"}, {0, "second"},
 			},
-			ExpectedErrors: []error{},
+			ExpectedErrors: []expectedError{},
 		},
 		{
 			Summary: "Expected messages delivered, but after timeout",
 			DelayMessages: []delayMessage[string]{
 				{0, "foo"}, {0, "second"}, {300 * time.Millisecond, "hello"}, {300 * time.Millisecond, "world"},
 			},
-			ExpectedErrors: []error{chanassert.ErrActiveLayerUnsatisfied, chanassert.ErrRejectedMessage, chanassert.ErrUnsatisfiedExpecter},
+			ExpectedErrors: []expectedError{unsatisfiedError, rejectedError, terminatedError},
 		},
 		{
 			Summary: "Expected messages delivered, with some unexpected",
 			DelayMessages: []delayMessage[string]{
 				{0, "hello"}, {0, "world"}, {0, "bar"}, {0, "foo"}, {0, "2nd"},
 			},
-			ExpectedErrors: []error{chanassert.ErrRejectedMessage},
+			ExpectedErrors: []expectedError{rejectedError},
 		},
 		{
 			Summary: "Insufficient expected messages",
 			DelayMessages: []delayMessage[string]{
 				{0, "hello"}, {0, "world"},
 			},
-			ExpectedErrors: []error{chanassert.ErrActiveLayerUnsatisfied, chanassert.ErrUnsatisfiedExpecter},
+			ExpectedErrors: []expectedError{unsatisfiedError, terminatedError},
 		},
 		{
 			Summary: "Insufficient expected messages, with unexpected messages",
 			DelayMessages: []delayMessage[string]{
 				{0, "hello"}, {0, "bar"}, {0, "world"},
 			},
-			ExpectedErrors: []error{chanassert.ErrRejectedMessage, chanassert.ErrUnsatisfiedExpecter, chanassert.ErrActiveLayerUnsatisfied},
+			ExpectedErrors: []expectedError{rejectedError, terminatedError, unsatisfiedError},
 		},
 	}
 
@@ -383,27 +406,27 @@ func Test_ExpectAny_MultipleCombiner(t *testing.T) {
 		{
 			Summary:        "Expected messages delivered with unknown messages",
 			Messages:       []string{"hello", "3rd", "world", "second", "first"},
-			ExpectedErrors: []error{chanassert.ErrRejectedMessage},
+			ExpectedErrors: []expectedError{rejectedError},
 		},
 		{
 			Summary:        "Expected messages for first combiner only",
 			Messages:       []string{"hello", "first", "world"},
-			ExpectedErrors: []error{},
+			ExpectedErrors: []expectedError{},
 		},
 		{
 			Summary:        "Expected messages for second combiner only",
 			Messages:       []string{"2nd"},
-			ExpectedErrors: []error{},
+			ExpectedErrors: []expectedError{},
 		},
 		{
 			Summary:        "Expected messages for second combiner only, but matching messages for first",
 			Messages:       []string{"hello", "world", "second", "first"},
-			ExpectedErrors: []error{},
+			ExpectedErrors: []expectedError{},
 		},
 		{
 			Summary:        "Not enough messages for first combiner",
 			Messages:       []string{"hello", "world"},
-			ExpectedErrors: []error{chanassert.ErrActiveLayerUnsatisfied, chanassert.ErrUnsatisfiedExpecter},
+			ExpectedErrors: []expectedError{unsatisfiedError, terminatedError},
 		},
 	}
 
@@ -438,12 +461,12 @@ func Test_ExpectAnyTimeout_MultipleCombiner(t *testing.T) {
 		{
 			Summary:        "Messages expected in defined order after timeout (A)",
 			DelayMessages:  []delayMessage[string]{{0, "hello"}, {time.Millisecond * 500, "world"}, {0, "first"}, {0, "second"}},
-			ExpectedErrors: []error{chanassert.ErrRejectedMessage, chanassert.ErrUnsatisfiedExpecter, chanassert.ErrActiveLayerUnsatisfied},
+			ExpectedErrors: []expectedError{rejectedError, terminatedError, unsatisfiedError},
 		},
 		{
 			Summary:        "Messages expected in defined order after timeout (B)",
 			DelayMessages:  []delayMessage[string]{{0, "hello"}, {0, "world"}, {time.Millisecond * 500, "first"}, {0, "2nd"}},
-			ExpectedErrors: []error{chanassert.ErrRejectedMessage, chanassert.ErrUnsatisfiedExpecter, chanassert.ErrActiveLayerUnsatisfied},
+			ExpectedErrors: []expectedError{rejectedError, terminatedError, unsatisfiedError},
 		},
 		{
 			Summary:       "Messages expected in random order",
@@ -452,27 +475,27 @@ func Test_ExpectAnyTimeout_MultipleCombiner(t *testing.T) {
 		{
 			Summary:        "Expected messages delivered with unknown messages",
 			DelayMessages:  []delayMessage[string]{{0, "hello"}, {0, "3rd"}, {0, "world"}, {0, "second"}, {0, "first"}},
-			ExpectedErrors: []error{chanassert.ErrRejectedMessage},
+			ExpectedErrors: []expectedError{rejectedError},
 		},
 		{
 			Summary:        "Expected messages for first combiner only",
 			DelayMessages:  []delayMessage[string]{{0, "hello"}, {time.Millisecond * 500, "first"}, {0, "world"}},
-			ExpectedErrors: []error{chanassert.ErrRejectedMessage, chanassert.ErrUnsatisfiedExpecter, chanassert.ErrActiveLayerUnsatisfied},
+			ExpectedErrors: []expectedError{rejectedError, terminatedError, unsatisfiedError},
 		},
 		{
 			Summary:        "Expected messages for second combiner only",
 			DelayMessages:  []delayMessage[string]{{0, "2nd"}},
-			ExpectedErrors: []error{},
+			ExpectedErrors: []expectedError{},
 		},
 		{
 			Summary:        "Expected messages for second combiner only, but matching messages for first",
 			DelayMessages:  []delayMessage[string]{{0, "hello"}, {0, "world"}, {0, "second"}, {0, "first"}},
-			ExpectedErrors: []error{},
+			ExpectedErrors: []expectedError{},
 		},
 		{
 			Summary:        "Not enough messages for first combiner",
 			DelayMessages:  []delayMessage[string]{{0, "hello"}, {0, "world"}},
-			ExpectedErrors: []error{chanassert.ErrActiveLayerUnsatisfied, chanassert.ErrUnsatisfiedExpecter},
+			ExpectedErrors: []expectedError{unsatisfiedError, terminatedError},
 		},
 	}
 

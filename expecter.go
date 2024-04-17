@@ -56,6 +56,36 @@ type Layer[T any] interface {
 	Begin()
 }
 
+type RejectionError[T any] struct {
+	MessageNum    int
+	MessageResult MessageResult[T]
+}
+
+func (e RejectionError[T]) Error() string {
+	return fmt.Sprintf(
+		"message #%d (%v) was unexpected by layer #%d",
+		e.MessageNum,
+		e.MessageResult.Message,
+		e.MessageResult.LayerIdx,
+	)
+}
+
+type TerminatedError struct {
+	Timeout time.Duration
+}
+
+func (e TerminatedError) Error() string {
+	return fmt.Sprintf("expecter did not finish within the %s timeout specified", e.Timeout.String())
+}
+
+type UnsatisfiedError struct {
+	ActiveLayerIdx int
+}
+
+func (e UnsatisfiedError) Error() string {
+	return fmt.Sprintf("active layer (layer #%d) never became satisfied", e.ActiveLayerIdx)
+}
+
 type Errors []error
 
 func (errs Errors) String() string {
@@ -86,28 +116,31 @@ type Expecter[T any] interface {
 	FPrintTrace(w io.Writer)
 	ProcessedMessages() []MessageResult[T]
 
+	Debug() Expecter[T]
+
 	Listen()
 }
 
 type expecter[T any] struct {
-	channel        chan T
-	ignoreMatchers []Matcher[T]
-	currentLayer   int
-	expectLayers   []Layer[T]
-	wg             *sync.WaitGroup
-	closeChan      chan struct{}
-	results        []MessageResult[T]
+	channel           chan T
+	ignoreMatchers    []Matcher[T]
+	currentLayerIndex int
+	expectLayers      []Layer[T]
+	wg                *sync.WaitGroup
+	closeChan         chan struct{}
+	results           []MessageResult[T]
+	debug             bool
 }
 
 func NewChannelExpecter[T any](channel chan T) *expecter[T] {
 	return &expecter[T]{
-		channel:        channel,
-		currentLayer:   0,
-		ignoreMatchers: make([]Matcher[T], 0),
-		expectLayers:   make([]Layer[T], 0),
-		closeChan:      make(chan struct{}, 1),
-		wg:             &sync.WaitGroup{},
-		results:        make([]MessageResult[T], 0),
+		channel:           channel,
+		currentLayerIndex: 0,
+		ignoreMatchers:    make([]Matcher[T], 0),
+		expectLayers:      make([]Layer[T], 0),
+		closeChan:         make(chan struct{}, 1),
+		wg:                &sync.WaitGroup{},
+		results:           make([]MessageResult[T], 0),
 	}
 }
 
@@ -197,13 +230,13 @@ func (exp *expecter[T]) Listen() {
 	exp.wg.Add(1)
 	go func() {
 		defer exp.wg.Done()
-		exp.currentLayer = 0
+		exp.currentLayerIndex = 0
 		for {
-			if exp.currentLayer >= len(exp.expectLayers) {
+			if exp.currentLayerIndex >= len(exp.expectLayers) {
 				return
 			}
 
-			layer := exp.expectLayers[exp.currentLayer]
+			layer := exp.expectLayers[exp.currentLayerIndex]
 			layer.Begin()
 
 			select {
@@ -217,9 +250,10 @@ func (exp *expecter[T]) Listen() {
 
 				if ok, trace := exp.shouldIgnoreMessage(message); ok {
 					exp.results = append(exp.results, MessageResult[T]{
-						Message: message,
-						Status:  Ignored,
-						Trace:   trace,
+						Message:  message,
+						LayerIdx: -1,
+						Status:   Ignored,
+						Trace:    trace,
 					})
 
 					continue
@@ -232,18 +266,41 @@ func (exp *expecter[T]) Listen() {
 				}
 
 				exp.results = append(exp.results, MessageResult[T]{
-					Message: message,
-					Status:  status,
-					Trace:   trace,
+					Message:  message,
+					LayerIdx: exp.currentLayerIndex,
+					Status:   status,
+					Trace:    trace,
 				})
 
 				if status == Accepted && layer.IsSatisfied() {
-					exp.currentLayer++
+					exp.currentLayerIndex++
 					continue
 				}
 			}
 		}
 	}()
+}
+
+// awaitFinished will wait for the expecter to finish, terminating
+// it after the timeout specified. If the expecter finished without
+// requiring termination, true is returned, else false.
+func (exp *expecter[T]) awaitFinished(timeout time.Duration) bool {
+	finished := make(chan struct{}, 1)
+	go func() {
+		exp.wg.Wait()
+		finished <- struct{}{}
+	}()
+
+	terminated := false
+	select {
+	case <-time.NewTimer(timeout).C:
+		terminated = true
+		exp.closeChan <- struct{}{}
+		<-finished
+	case <-finished:
+	}
+
+	return !terminated
 }
 
 // AwaitSatisfied will wait (up to the timeout) for the expecter to see all layers
@@ -261,60 +318,84 @@ func (exp *expecter[T]) AwaitSatisfied(timeout time.Duration) Errors {
 		outErr = append(outErr, err)
 	}
 
-	// Wait for the listen loop to close, up to timeout. Otherwise, close it manually
-	finished := make(chan struct{}, 1)
-	go func() {
-		exp.wg.Wait()
-		finished <- struct{}{}
-	}()
-
-	select {
-	case <-time.NewTimer(timeout).C:
-		reportErr(ErrUnsatisfiedExpecter)
-		exp.closeChan <- struct{}{}
-		<-finished
-	case <-finished:
+	if !exp.awaitFinished(timeout) {
+		reportErr(TerminatedError{timeout})
 	}
 
 	for idx, res := range exp.results {
 		if res.Status == Rejected {
-			reportErr(fmt.Errorf("message #%d (%+v) REJECTED: %w", idx, res.Message, ErrRejectedMessage))
+			reportErr(RejectionError[T]{MessageNum: idx, MessageResult: res})
 		}
 	}
 
-	if exp.currentLayer < len(exp.expectLayers) {
-		maybeLayer := exp.expectLayers[exp.currentLayer]
-		if maybeLayer != nil {
-			if !maybeLayer.IsSatisfied() {
-				reportErr(fmt.Errorf("layer #%d: %w", exp.currentLayer, ErrActiveLayerUnsatisfied))
-			}
+	if exp.currentLayerIndex < len(exp.expectLayers) {
+		currentLayer := exp.expectLayers[exp.currentLayerIndex]
+		if currentLayer != nil && !currentLayer.IsSatisfied() {
+			reportErr(UnsatisfiedError{exp.currentLayerIndex})
 		}
 	}
 
 	return outErr
 }
 
-// AssertSatisfied will use AwaitSatisfied to wait
-// for the expecters read loop to close (see Listen) up
-// to the timeout provided. If any errors are returned
-// by AwaitSatisfied, then these errors will be
-// raised on the testing.T instance using Errorf *and*
-// the trace of the expecter will automatically be logged.
-//
-// For more information about how expecter errors are gathered, see AwaitSatisfied.
+// AssertSatisfied ...
+// expecter error: received messages which could not be matched (8 messages, across 2 layers).
+// expecter error: layer #0: unexpected message: ”
+// expecter error: layer #1: unexpected message: ”
+// expecter error: failed to become satisfied: HINT: use .Debug() on your expecter to enable verbose message tracing.
 func (exp *expecter[T]) AssertSatisfied(t *testing.T, timeout time.Duration) {
-	errors := exp.AwaitSatisfied(timeout)
-	for _, e := range errors {
-		t.Errorf("expecter error: %s", e)
+	layers := make(map[int]struct{})
+	rejections := 0
+	errs := exp.AwaitSatisfied(timeout)
+	for _, err := range errs {
+		var rejectErr RejectionError[T]
+		if errors.As(err, &rejectErr) {
+			layers[rejectErr.MessageResult.LayerIdx] = struct{}{}
+			rejections++
+		}
 	}
 
-	if len(errors) > 0 {
-		t.Errorf("satisified assertion failed: expecter encountered errors (%d)", len(errors))
+	if rejections > 0 {
+		t.Errorf("expecter error: received messages which could not be matched (%d messages, across %d layers)", rejections, len(layers))
+	}
 
+	for _, e := range errs {
 		stringBuilder := &strings.Builder{}
-		exp.FPrintTrace(stringBuilder)
-		t.Log(stringBuilder)
+		stringBuilder.WriteString("expecter error: ")
+		stringBuilder.WriteString(e.Error())
+
+		if !exp.debug {
+			var rejectErr RejectionError[T]
+			if errors.As(e, &rejectErr) {
+				stringBuilder.WriteString("\n")
+				rejectErr.MessageResult.PrettyPrint(stringBuilder)
+			}
+		}
+
+		t.Error(stringBuilder.String())
 	}
+
+	if len(errs) > 0 {
+		if exp.debug {
+			stringBuilder := &strings.Builder{}
+			stringBuilder.WriteString("EXPECTER: DEBUG enabled: trace of processed messages follow:\n")
+			exp.FPrintTrace(stringBuilder)
+			t.Log(stringBuilder.String())
+		} else {
+			t.Errorf("expecter error: failed to become satisfied: HINT: use .Debug() to enable verbose message tracing")
+		}
+	}
+}
+
+// Debug enables a full print out of the expecters FULL
+// trace when any errors are reported by [AssertSatisfied]. This
+// has no implications for other behaviour.
+//
+// If Debug is not called, then only traces for rejected
+// messages are printed when using [AssertSatisfied].
+func (exp *expecter[T]) Debug() Expecter[T] {
+	exp.debug = true
+	return exp
 }
 
 // PrintTrace prints a formatted representation
@@ -326,7 +407,6 @@ func (exp *expecter[T]) PrintTrace() {
 // FPrintTrace prints a formatted representation
 // of the expecter trace to the writer provided.
 func (exp *expecter[T]) FPrintTrace(w io.Writer) {
-	fmt.Fprint(w, "EXPECTER: trace of processed messages follow:\n")
 	for _, msg := range exp.results {
 		msg.PrettyPrint(w)
 	}

@@ -10,24 +10,7 @@ import (
 	"os"
 	"strings"
 	"sync"
-	"testing"
 	"time"
-)
-
-var (
-	// ErrUnsatisfiedExpecter indicates that the expecter did not 'finish' on
-	// it's own before the timeout provided to this function.
-	ErrUnsatisfiedExpecter = errors.New("expecter did not become satisfied within timeout")
-
-	// ErrRejectedMessage indicates a message was received by the expecter
-	// but could not be matched against the active layer.
-	ErrRejectedMessage = errors.New("expecter received message which was rejected")
-
-	// ErrActiveLayerUnsatisfied indicates that the active layer at the time
-	// of the expecter finishing was not satisfied. In the absence of an
-	// UnsatisfiedExpecterErr, this indicates the message channel closed before the expecter
-	// witnessed enough messages to satisfy it's expectations.
-	ErrActiveLayerUnsatisfied = errors.New("active layer of expecter did not become satisfied")
 )
 
 type Combiner[T any] interface {
@@ -56,6 +39,36 @@ type Layer[T any] interface {
 	Begin()
 }
 
+type RejectionError[T any] struct {
+	MessageNum    int
+	MessageResult MessageResult[T]
+}
+
+func (e RejectionError[T]) Error() string {
+	return fmt.Sprintf(
+		"message #%d (%v) was unexpected by layer #%d",
+		e.MessageNum,
+		e.MessageResult.Message,
+		e.MessageResult.LayerIdx,
+	)
+}
+
+type TerminatedError struct {
+	Timeout time.Duration
+}
+
+func (e TerminatedError) Error() string {
+	return fmt.Sprintf("expecter did not finish within the %s timeout specified", e.Timeout.String())
+}
+
+type UnsatisfiedError struct {
+	ActiveLayerIdx int
+}
+
+func (e UnsatisfiedError) Error() string {
+	return fmt.Sprintf("active layer (layer #%d) never became satisfied", e.ActiveLayerIdx)
+}
+
 type Errors []error
 
 func (errs Errors) String() string {
@@ -79,35 +92,38 @@ type Expecter[T any] interface {
 
 	Ignore(matchers ...Matcher[T]) Expecter[T]
 
-	AssertSatisfied(t *testing.T, timeout time.Duration)
+	AssertSatisfied(t TestingT, timeout time.Duration)
 	AwaitSatisfied(timeout time.Duration) Errors
 
 	PrintTrace()
 	FPrintTrace(w io.Writer)
 	ProcessedMessages() []MessageResult[T]
 
+	Debug() Expecter[T]
+
 	Listen()
 }
 
 type expecter[T any] struct {
-	channel        chan T
-	ignoreMatchers []Matcher[T]
-	currentLayer   int
-	expectLayers   []Layer[T]
-	wg             *sync.WaitGroup
-	closeChan      chan struct{}
-	results        []MessageResult[T]
+	channel           chan T
+	ignoreMatchers    []Matcher[T]
+	currentLayerIndex int
+	expectLayers      []Layer[T]
+	wg                *sync.WaitGroup
+	closeChan         chan struct{}
+	results           []MessageResult[T]
+	debug             bool
 }
 
 func NewChannelExpecter[T any](channel chan T) *expecter[T] {
 	return &expecter[T]{
-		channel:        channel,
-		currentLayer:   0,
-		ignoreMatchers: make([]Matcher[T], 0),
-		expectLayers:   make([]Layer[T], 0),
-		closeChan:      make(chan struct{}, 1),
-		wg:             &sync.WaitGroup{},
-		results:        make([]MessageResult[T], 0),
+		channel:           channel,
+		currentLayerIndex: 0,
+		ignoreMatchers:    make([]Matcher[T], 0),
+		expectLayers:      make([]Layer[T], 0),
+		closeChan:         make(chan struct{}, 1),
+		wg:                &sync.WaitGroup{},
+		results:           make([]MessageResult[T], 0),
 	}
 }
 
@@ -197,13 +213,13 @@ func (exp *expecter[T]) Listen() {
 	exp.wg.Add(1)
 	go func() {
 		defer exp.wg.Done()
-		exp.currentLayer = 0
+		exp.currentLayerIndex = 0
 		for {
-			if exp.currentLayer >= len(exp.expectLayers) {
+			if exp.currentLayerIndex >= len(exp.expectLayers) {
 				return
 			}
 
-			layer := exp.expectLayers[exp.currentLayer]
+			layer := exp.expectLayers[exp.currentLayerIndex]
 			layer.Begin()
 
 			select {
@@ -212,14 +228,17 @@ func (exp *expecter[T]) Listen() {
 			case message, ok := <-exp.channel:
 				if !ok {
 					// channel closed
+					// TODO: consider still listening to the channel, and log any
+					// further messages as rejections.
 					return
 				}
 
 				if ok, trace := exp.shouldIgnoreMessage(message); ok {
 					exp.results = append(exp.results, MessageResult[T]{
-						Message: message,
-						Status:  Ignored,
-						Trace:   trace,
+						Message:  message,
+						LayerIdx: -1,
+						Status:   Ignored,
+						Trace:    trace,
 					})
 
 					continue
@@ -232,13 +251,14 @@ func (exp *expecter[T]) Listen() {
 				}
 
 				exp.results = append(exp.results, MessageResult[T]{
-					Message: message,
-					Status:  status,
-					Trace:   trace,
+					Message:  message,
+					LayerIdx: exp.currentLayerIndex,
+					Status:   status,
+					Trace:    trace,
 				})
 
 				if status == Accepted && layer.IsSatisfied() {
-					exp.currentLayer++
+					exp.currentLayerIndex++
 					continue
 				}
 			}
@@ -246,75 +266,137 @@ func (exp *expecter[T]) Listen() {
 	}()
 }
 
-// AwaitSatisfied will wait (up to the timeout) for the expecter to see all layers
-// specified as being satisfied. If the expecter does not become satisfied in time,
-// it will be forcibly closed.
-//
-// The returns 'Errors' is a slice of all the errors found when looking through the
-// state of the expecter. The errors will always wrap one of the following errors:
-//   - [ErrUnsatisfiedExpecter]
-//   - [ErrRejectedMessage]
-//   - [ErrActiveLayerUnsatisfied]
-func (exp *expecter[T]) AwaitSatisfied(timeout time.Duration) Errors {
-	outErr := make([]error, 0)
-	reportErr := func(err error) {
-		outErr = append(outErr, err)
-	}
-
-	// Wait for the listen loop to close, up to timeout. Otherwise, close it manually
+// awaitFinished will wait for the expecter to finish, terminating
+// it after the timeout specified. If the expecter finished without
+// requiring termination, true is returned, else false.
+func (exp *expecter[T]) awaitFinished(timeout time.Duration) bool {
 	finished := make(chan struct{}, 1)
 	go func() {
 		exp.wg.Wait()
 		finished <- struct{}{}
 	}()
 
+	terminated := false
 	select {
 	case <-time.NewTimer(timeout).C:
-		reportErr(ErrUnsatisfiedExpecter)
+		terminated = true
 		exp.closeChan <- struct{}{}
 		<-finished
 	case <-finished:
 	}
 
+	return !terminated
+}
+
+// AwaitSatisfied will wait (up to the timeout) for the expecter to see all layers
+// specified as being satisfied. If the expecter does not become satisfied in time,
+// it will be forcibly closed.
+//
+// The returns 'Errors' is a slice of all the errors found when looking through the
+// state of the expecter. The errors will consist of the following errors:
+//   - [TerminatedError]
+//   - [RejectionError]
+//   - [UnsatisfiedError]
+func (exp *expecter[T]) AwaitSatisfied(timeout time.Duration) Errors {
+	outErr := make([]error, 0)
+	reportErr := func(err error) {
+		outErr = append(outErr, err)
+	}
+
+	if !exp.awaitFinished(timeout) {
+		reportErr(TerminatedError{timeout})
+	}
+
 	for idx, res := range exp.results {
 		if res.Status == Rejected {
-			reportErr(fmt.Errorf("message #%d (%+v) REJECTED: %w", idx, res.Message, ErrRejectedMessage))
+			reportErr(RejectionError[T]{MessageNum: idx, MessageResult: res})
 		}
 	}
 
-	if exp.currentLayer < len(exp.expectLayers) {
-		maybeLayer := exp.expectLayers[exp.currentLayer]
-		if maybeLayer != nil {
-			if !maybeLayer.IsSatisfied() {
-				reportErr(fmt.Errorf("layer #%d: %w", exp.currentLayer, ErrActiveLayerUnsatisfied))
-			}
+	if exp.currentLayerIndex < len(exp.expectLayers) {
+		currentLayer := exp.expectLayers[exp.currentLayerIndex]
+		if currentLayer != nil && !currentLayer.IsSatisfied() {
+			reportErr(UnsatisfiedError{exp.currentLayerIndex})
 		}
 	}
 
 	return outErr
 }
 
-// AssertSatisfied will use AwaitSatisfied to wait
-// for the expecters read loop to close (see Listen) up
-// to the timeout provided. If any errors are returned
-// by AwaitSatisfied, then these errors will be
-// raised on the testing.T instance using Errorf *and*
-// the trace of the expecter will automatically be logged.
+// TestingT is a minimal interface which mimics the standard
+// [testing.T] struct. This is used in places that chanassert accepts
+// a testing.T in order to allow unit testing of it's behaviour.
+type TestingT interface {
+	Errorf(format string, args ...any)
+	Logf(format string, args ...any)
+	Error(args ...any)
+	Log(args ...any)
+}
+
+// AssertSatisfied will wait for the expecter to finish on it's own for the timeout
+// specified, if the expecter fails to finish, it will be terminated. Any errors
+// generated by the expecter will then be logged to the type implementing [TestingT] provided.
 //
-// For more information about how expecter errors are gathered, see AwaitSatisfied.
-func (exp *expecter[T]) AssertSatisfied(t *testing.T, timeout time.Duration) {
-	errors := exp.AwaitSatisfied(timeout)
-	for _, e := range errors {
-		t.Errorf("expecter error: %s", e)
+// If the expecters Debug mode is enabled, then any errors will cause the full expecter message
+// trace to be printed to the [TestingT] provided. If not Debug, then only the
+// trace for any message rejections will be printed.
+//
+// For more information on the errors the expecter can generate, see [AwaitSatisfied].
+func (exp *expecter[T]) AssertSatisfied(t TestingT, timeout time.Duration) {
+	layers := make(map[int]struct{})
+	rejections := 0
+	errs := exp.AwaitSatisfied(timeout)
+	for _, err := range errs {
+		var rejectErr RejectionError[T]
+		if errors.As(err, &rejectErr) {
+			layers[rejectErr.MessageResult.LayerIdx] = struct{}{}
+			rejections++
+		}
 	}
 
-	if len(errors) > 0 {
-		t.Errorf("satisified assertion failed: expecter encountered errors (%d)", len(errors))
+	if rejections > 0 {
+		t.Errorf("expecter error: received messages which could not be matched (%d messages, across %d layers)", rejections, len(layers))
+	}
 
+	for _, e := range errs {
 		stringBuilder := &strings.Builder{}
-		exp.FPrintTrace(stringBuilder)
-		t.Log(stringBuilder)
+		stringBuilder.WriteString("expecter error: ")
+		stringBuilder.WriteString(e.Error())
+
+		if !exp.debug {
+			var rejectErr RejectionError[T]
+			if errors.As(e, &rejectErr) {
+				stringBuilder.WriteString("\n")
+				rejectErr.MessageResult.PrettyPrint(stringBuilder, false)
+			}
+		}
+
+		t.Error(stringBuilder.String())
 	}
+
+	if len(errs) > 0 {
+		if exp.debug {
+			t.Errorf("expecter error: failed to become satisfied")
+
+			stringBuilder := &strings.Builder{}
+			stringBuilder.WriteString("EXPECTER: DEBUG enabled: trace of processed messages follow:\n")
+			exp.FPrintTrace(stringBuilder)
+			t.Log(stringBuilder.String())
+		} else {
+			t.Errorf("expecter error: failed to become satisfied: HINT: use .Debug() to enable verbose message tracing")
+		}
+	}
+}
+
+// Debug enables a full print out of the expecters FULL
+// trace when any errors are reported by [AssertSatisfied]. This
+// has no implications for other behaviour.
+//
+// If Debug is not called, then only traces for rejected
+// messages are printed when using [AssertSatisfied].
+func (exp *expecter[T]) Debug() Expecter[T] {
+	exp.debug = true
+	return exp
 }
 
 // PrintTrace prints a formatted representation
@@ -326,9 +408,8 @@ func (exp *expecter[T]) PrintTrace() {
 // FPrintTrace prints a formatted representation
 // of the expecter trace to the writer provided.
 func (exp *expecter[T]) FPrintTrace(w io.Writer) {
-	fmt.Fprint(w, "EXPECTER: trace of processed messages follow:\n")
 	for _, msg := range exp.results {
-		msg.PrettyPrint(w)
+		msg.PrettyPrint(w, exp.debug)
 	}
 }
 

@@ -1,4 +1,3 @@
-EXPECTER: trace of processed messages follow:
 Message 'foo' - ACCEPTED:
   - Layer #0 matched message against combiner #1
     * Combiner #0: Combiner failed match message

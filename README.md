@@ -189,9 +189,16 @@ flowchart TD
 When crafting complex assertions it can start to become difficult to figure out why your test may be failed. Is it because your channel is misbehaving, or is it because your
 assertions aren't quite right...
 
+By default, Chanassert will print out detailed errors when using `AssertSatisfied(t *testing.T, timeout time.Duration)`. These errors will describe
+*why* the expecter was unhappy, including the trace of any messages which were rejected by the expecter.
+
+>[!TIP]
+> You can also use `AwaitSatisfied(timeout time.Duration)` to get manually access the errors without any automatic error printing.
+
 Chanassert provides very detailed tracing capabilities which allow you to view the path each message took as it was processed by
 the expecter. There are a number of ways to see this trace:
-- When using `AssertSatisfied`, the trace will be printed using `(*testing.T).Log` automatically if the expecter has encountered any errors
+- When using `AssertSatisfied`, the trace for specific message rejections will be printed using `(*testing.T).Log` automatically,
+    - You can also enable debug-mode by calling `.Debug()` on the expecter, which will print out the entire trace when any failures occur,
 - `PrintTrace` on the expecter (prints formatted trace to stdout),
 - `FPrintTrace`, to print formatted trace to a given `io.Writer`,
 - Access the trace data directly using `ProcessedMessages`.

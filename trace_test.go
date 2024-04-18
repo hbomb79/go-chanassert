@@ -67,7 +67,7 @@ func runTraceTests(t *testing.T, makeExpecter func() (chan string, chanassert.Ex
 			t.Parallel()
 
 			ch, expecter := makeExpecter()
-			expecter.Listen()
+			expecter.Debug().Listen()
 			for _, m := range data.messages {
 				ch <- m.str
 			}

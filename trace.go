@@ -29,7 +29,7 @@ func newDebugTrace(message string, nested ...TraceMessage) TraceMessage {
 
 var levelPrefixes = []rune{'-', '*', '+', '>'}
 
-func (msg TraceMessage) PrintTrace(writer io.Writer, nestLevel int) {
+func (msg TraceMessage) PrintTrace(writer io.Writer, includeDebug bool, nestLevel int) {
 	fmt.Fprint(writer, strings.Repeat("  ", nestLevel+1))
 
 	prefix := levelPrefixes[nestLevel%len(levelPrefixes)]
@@ -39,11 +39,13 @@ func (msg TraceMessage) PrintTrace(writer io.Writer, nestLevel int) {
 	case info:
 		fmt.Fprintf(writer, "%c %s\n", prefix, msg.Message)
 	case debug:
-		fmt.Fprintf(writer, "%c [DEBUG] %s\n", prefix, msg.Message)
+		if includeDebug {
+			fmt.Fprintf(writer, "%c [DEBUG] %s\n", prefix, msg.Message)
+		}
 	}
 
 	for _, trace := range msg.Nested {
-		trace.PrintTrace(writer, nestLevel+1)
+		trace.PrintTrace(writer, includeDebug, nestLevel+1)
 	}
 }
 
@@ -76,9 +78,9 @@ type MessageResult[T any] struct {
 	Trace    TraceMessage
 }
 
-func (result MessageResult[T]) PrettyPrint(writer io.Writer) {
+func (result MessageResult[T]) PrettyPrint(writer io.Writer, includeDebug bool) {
 	fmt.Fprintf(writer, "Message '%+v' - %s:\n", result.Message, result.Status)
 
-	result.Trace.PrintTrace(writer, 0)
+	result.Trace.PrintTrace(writer, includeDebug, 0)
 	fmt.Fprintln(writer, "")
 }

@@ -155,9 +155,6 @@ Now that we understand the fundamental concepts, we can explain how they all lin
 A freshly created expecter (`NewChannelExpecter`) starts 'asleep'. It does not listen to the channel you've provided. First, you must
 call `.Listen` on the expecter, which starts a goroutine to listen to the channel you provided.
 
-> [!NOTE]
-> An expecter becomes satisfied when it's seen all the messages it _expected_ to see, however this does not mean the expecter is without errors. A satisfied expecter may have seen messages it did *not* expect, which is not mutually exclusive with seeing all the messages it *did* expect.
-
 Once an expecter is listening, it will make it's first layer 'active'. Any time a message is received over the channel, it will be sent to active layer to see if the message matches.
 
 If the message was _accepted_ by the active layer, we check if the layer is satisfied (meaning all combiners it contains are satisfied);
@@ -167,6 +164,9 @@ This loop will continue to run until:
 - the expecter is satisfied (i.e. all layers are satisfied),
 - the expecter is terminated due to exceeding the timeout when using either of `AwaitSatisfied(timeout)` or `AssertSatisfied(t, timeout)`,
 - the channel closes.
+
+> [!NOTE]
+> An expecter becomes satisfied when it's seen all the messages it _expected_ to see, however this does not mean the expecter is without errors. A satisfied expecter may have seen messages it did *not* expect, which is not mutually exclusive with seeing all the messages it *did* expect.
 
 ```mermaid
 flowchart TD
